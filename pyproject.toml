@@ -1,14 +1,47 @@
+[build-system]
+requires = ["setuptools_scm[simple]>=8"]
+
 [project]
+dynamic = ["version"]
 name = "nagoya-bus-mcp"
-version = "0.1.0"
-description = "Add your description here"
+description = "Model Context Protocol (MCP) server providing tools to query Nagoya City bus timetables"
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [
+    { name = "Yusuke Miyazaki", email = "miyazaki.dev@gmail.com" },
+]
+maintainers = [
+    { name = "Yusuke Miyazaki", email = "miyazaki.dev@gmail.com" },
+]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = [
+    "mcp",
+    "model context protocol",
+    "fastmcp",
+    "nagoya",
+    "bus",
+    "public transport",
+    "transit",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
 dependencies = [
     "fastmcp>=2.10.6",
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/ymyzk/nagoya-bus-mcp"
+Repository = "https://github.com/ymyzk/nagoya-bus-mcp"
+Issues = "https://github.com/ymyzk/nagoya-bus-mcp/issues"
 
 [project.scripts]
 nagoya_bus_mcp = "nagoya_bus_mcp.__main__:main"
