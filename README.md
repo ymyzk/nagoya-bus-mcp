@@ -31,7 +31,7 @@ Add the following configuration to `.vscode/mcp.json`.
 }
 ```
 
-## Manual
+### Manual
 ```shell
 $ uvx nagoya_bus_mcp
 ```
