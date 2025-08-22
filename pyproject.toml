@@ -1,0 +1,53 @@
+[project]
+name = "nagoya-bus-mcp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastmcp>=2.10.6",
+    "httpx>=0.28.1",
+    "pydantic>=2.11.7",
+]
+
+[project.scripts]
+nagoya_bus_mcp = "nagoya_bus_mcp.__main__:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.0",
+    "pre-commit>=4.2.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-randomly>=3.16.0",
+    "pytest-cov>=6.2.1",
+]
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov -m 'not integration' --strict"
+markers = [
+    "integration: mark a test as an integration test",
+]
+
+[tool.ruff]
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "D", "FIX002", "PLC2401", "T201", "TD"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = [
+    # flake8-bandit: assert
+    "S101",
+]
+
+[tool.uv]
+package = true
