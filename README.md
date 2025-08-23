@@ -36,5 +36,9 @@ Add the following configuration to `.vscode/mcp.json`.
 
 ### Manual
 ```shell
+# Using uvx
 $ uvx nagoya_bus_mcp
+
+# Using Docker
+$ docker run -i --rm ghcr.io/ymyzk/nagoya-bus-mcp
 ```
