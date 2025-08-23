@@ -136,8 +136,9 @@ jobs:
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
       - name: Attest
+        if: github.event_name == 'release'
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
         with:
           subject-name: ghcr.io/ymyzk/nagoya-bus-mcp
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: ${{ github.event_name == 'release' }}
+          push-to-registry: true
