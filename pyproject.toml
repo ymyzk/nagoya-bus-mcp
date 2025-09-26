@@ -84,5 +84,10 @@ force-sort-within-sections = true
     "S101",
 ]
 
+[tool.setuptools_scm]
+# Workaround for https://github.com/dependabot/dependabot-core/issues/12340
+fallback_version = "0.0.0"
+
 [tool.uv]
 package = true
+cache-keys = [{ file = "pyproject.toml" }, { git = { commit = true } }]
