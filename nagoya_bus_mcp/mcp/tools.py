@@ -4,12 +4,12 @@ from logging import getLogger
 from operator import iadd
 from typing import Annotated
 
+from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from nagoya_bus_mcp.client import Client
 
 log = getLogger(__name__)
-client = Client()
 
 
 class StationNumberResponse(BaseModel):
@@ -37,26 +37,30 @@ _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 
 
-async def _get_station_names() -> dict[str, int]:
+async def _get_station_names(client: Client) -> dict[str, int]:
     global _cached_station_names  # noqa: PLW0603
     if _cached_station_names is None:
         _cached_station_names = (await client.get_station_names()).root
     return _cached_station_names
 
 
-async def _get_station_numbers() -> dict[int, str]:
+async def _get_station_numbers(client: Client) -> dict[int, str]:
     global _cached_station_numbers  # noqa: PLW0603
     if _cached_station_numbers is None:
         _cached_station_numbers = {
-            num: name for name, num in (await _get_station_names()).items()
+            num: name for name, num in (await _get_station_names(client)).items()
         }
     return _cached_station_numbers
 
 
-async def get_station_number(station_name: str) -> StationNumberResponse | None:
+async def get_station_number(
+    ctx: Context, station_name: str
+) -> StationNumberResponse | None:
     """Get station number for a given station name."""
+    client = ctx.request_context.lifespan_context.bus_client
+
     log.info("Getting station number for %s", station_name)
-    station_names = await _get_station_names()
+    station_names = await _get_station_names(client)
 
     # First try exact match
     station_number = station_names.get(station_name)
@@ -89,9 +93,11 @@ async def get_station_number(station_name: str) -> StationNumberResponse | None:
     return StationNumberResponse(success=False)
 
 
-async def get_timetable(station_number: int) -> TimeTableResponse | None:
+async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse | None:
     """Get timetable for a given station."""
-    station_name = (await _get_station_numbers()).get(station_number)
+    client = ctx.request_context.lifespan_context.bus_client
+
+    station_name = (await _get_station_numbers(client)).get(station_number)
     if station_name is None:
         log.warning("Station number %s not found", station_number)
         return None
