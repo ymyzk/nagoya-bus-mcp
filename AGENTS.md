@@ -5,5 +5,5 @@ This repository provides an MCP (Model Context Protocol) server named "Nagoya Bu
 - **Run MCP server**: `uv run nagoya_bus_mcp`
 - **Run MCP server with inspector**: `npx @modelcontextprotocol/inspector uv run nagoya_bus_mcp`
 - **Run linter and formatter (pre-commit)**: `uv run pre-commit run --all-files`
-- **Run type checker**: `uv run mypy nagoya_bus_mcp`
+- **Run type checker**: `uv run mypy`
 - **Run all tests**: `uv run pytest`
