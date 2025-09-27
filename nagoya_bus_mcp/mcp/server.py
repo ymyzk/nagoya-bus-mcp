@@ -13,6 +13,12 @@ from nagoya_bus_mcp.mcp.tools import get_station_number, get_timetable
 
 log = getLogger(__name__)
 
+try:
+    from nagoya_bus_mcp.version import version
+except ImportError:
+    log.warning("nagoya_bus_mcp.version module not found, using default version")
+    version = "0.0.0"
+
 
 @dataclass
 class LifespanContext:
@@ -29,7 +35,7 @@ async def lifespan(_mcp: FastMCP) -> AsyncIterator[LifespanContext]:
     log.info("Lifespan context closed")
 
 
-mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version="0.1.0", lifespan=lifespan)
+mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version=version, lifespan=lifespan)
 mcp_server.tool(get_station_number)
 mcp_server.tool(get_timetable)
 mcp_server.prompt(ask_timetable)

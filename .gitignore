@@ -10,3 +10,4 @@ wheels/
 .venv
 
 .coverage
+/nagoya_bus_mcp/version.py
