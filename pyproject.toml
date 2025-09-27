@@ -46,7 +46,7 @@ Repository = "https://github.com/ymyzk/nagoya-bus-mcp"
 Issues = "https://github.com/ymyzk/nagoya-bus-mcp/issues"
 
 [project.scripts]
-nagoya_bus_mcp = "nagoya_bus_mcp.__main__:main"
+nagoya-bus-mcp = "nagoya_bus_mcp.__main__:main"
 
 [dependency-groups]
 dev = [

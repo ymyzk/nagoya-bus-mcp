@@ -13,7 +13,7 @@ Add the following configuration to `claude_desktop_config.json`.
   "mcpServers": {
     "nagoya-bus": {
       "command": "uvx",
-      "args": ["nagoya_bus_mcp"]
+      "args": ["nagoya-bus-mcp"]
     }
   }
 }
@@ -27,7 +27,7 @@ Add the following configuration to `.vscode/mcp.json`.
     "nagoya-bus": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["nagoya_bus_mcp"],
+      "args": ["nagoya-bus-mcp"],
       "env": {}
     }
   }
@@ -37,7 +37,7 @@ Add the following configuration to `.vscode/mcp.json`.
 ### Manual
 ```shell
 # Using uvx
-$ uvx nagoya_bus_mcp
+$ uvx nagoya-bus-mcp
 
 # Using Docker
 $ docker run -i --rm ghcr.io/ymyzk/nagoya-bus-mcp
