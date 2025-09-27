@@ -41,7 +41,7 @@ jobs:
       - name: Run pytest
         run: uv run pytest
       - name: Run mypy
-        run: uv run mypy nagoya_bus_mcp
+        run: uv run mypy
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ matrix.python-version == '3.13' }}
         with:
