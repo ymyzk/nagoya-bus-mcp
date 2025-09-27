@@ -8,8 +8,7 @@ from nagoya_bus_mcp.mcp.server import mcp_server
 NAGOYA_STATION_NUMBER = 41200
 
 
-# TODO: Remove loop_scope by implementing proper client clean up
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_station_names_succeeds() -> None:
     async with Client(mcp_server) as client:
@@ -23,7 +22,7 @@ async def test_get_station_names_succeeds() -> None:
         }
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_station_names_runs_fuzzy_matching() -> None:
     async with Client(mcp_server) as client:
@@ -37,7 +36,7 @@ async def test_get_station_names_runs_fuzzy_matching() -> None:
         }
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_station_names_runs_not_found() -> None:
     async with Client(mcp_server) as client:
@@ -51,7 +50,7 @@ async def test_get_station_names_runs_not_found() -> None:
         }
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
     async with Client(mcp_server) as client:
@@ -100,7 +99,7 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
                 assert re.match(r"^\d{1,2}:\d{2}$", t)
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_timetable_all_entries_have_valid_time_format() -> None:
     async with Client(mcp_server) as client:
@@ -119,7 +118,7 @@ async def test_get_timetable_all_entries_have_valid_time_format() -> None:
                     assert re.match(r"^\d{1,2}:\d{2}$", t)
 
 
-@pytest.mark.asyncio(loop_scope="module")
+@pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_timetable_not_found() -> None:
     async with Client(mcp_server) as client:
