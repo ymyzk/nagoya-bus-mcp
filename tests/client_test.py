@@ -3,6 +3,7 @@
 from collections.abc import AsyncGenerator, Callable
 import json
 from pathlib import Path
+import re
 from typing import Any
 
 import httpx
@@ -174,7 +175,8 @@ async def test_client_cannot_use_after_close(client_factory: ClientFactory) -> N
 
         # After closing, the client should not be usable
         with pytest.raises(
-            RuntimeError, match="Cannot send a request, as the client has been closed."
+            RuntimeError,
+            match=re.escape("Cannot send a request, as the client has been closed."),
         ):
             await client.get_station_names()
     finally:
