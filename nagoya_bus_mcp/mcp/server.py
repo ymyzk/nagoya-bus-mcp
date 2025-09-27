@@ -22,11 +22,11 @@ class LifespanContext:
 @asynccontextmanager
 async def lifespan(_mcp: FastMCP) -> AsyncIterator[LifespanContext]:
     log.info("Starting lifespan and initializing context")
-    context = LifespanContext(bus_client=Client())
-    yield context
-    log.info("Cleaning up lifespan and context")
-    await context.bus_client.close()
-    log.info("Clean up complete")
+    async with Client() as bus_client:
+        context = LifespanContext(bus_client=bus_client)
+        log.info("Lifespan context initialized")
+        yield context
+    log.info("Lifespan context closed")
 
 
 mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version="0.1.0", lifespan=lifespan)

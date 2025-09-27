@@ -1,5 +1,8 @@
 """HTTP client for Nagoya Bus API."""
 
+from types import TracebackType
+from typing import Self
+
 import httpx
 from pydantic import BaseModel, ConfigDict, RootModel
 
@@ -29,6 +32,19 @@ class Client:
         """Initialize the client with an httpx session."""
         self.base_url = base_url
         self.client = httpx.AsyncClient(base_url=base_url, transport=transport)
+
+    async def __aenter__(self) -> Self:
+        """Enter the async context manager by returning the client instance."""
+        return self
+
+    async def __aexit__(
+        self,
+        _exc_type: type[BaseException] | None,
+        _exc: BaseException | None,
+        _tb: TracebackType | None,
+    ) -> None:
+        """Ensure the underlying httpx client is closed on exit."""
+        await self.close()
 
     async def close(self) -> None:
         """Close the client session."""
@@ -64,8 +80,8 @@ if __name__ == "__main__":
     import asyncio
 
     async def main() -> None:
-        client = Client()
-        print(await client.get_station_names())
-        print(await client.get_station_diagram(22460))
+        async with Client() as client:
+            print(await client.get_station_names())
+            print(await client.get_station_diagram(22460))
 
     asyncio.run(main())
