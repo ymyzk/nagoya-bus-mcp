@@ -3,6 +3,10 @@
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/nagoya-bus-mcp)](https://pypi.org/project/nagoya-bus-mcp/)
 [![CI](https://github.com/ymyzk/nagoya-bus-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ymyzk/nagoya-bus-mcp/actions/workflows/ci.yml)
 
+<a href="https://glama.ai/mcp/servers/@ymyzk/nagoya-bus-mcp">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@ymyzk/nagoya-bus-mcp/badge" alt="Nagoya Bus MCP server" />
+</a>
+
 ## Getting started
 The Nagoya Bus MCP server is published to PyPI.
 
