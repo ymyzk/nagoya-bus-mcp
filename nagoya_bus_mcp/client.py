@@ -65,7 +65,7 @@ class Approach(BaseModel):
     """Real-time approach information model."""
     model_config = ConfigDict(alias_generator=str.upper)
 
-    latest_bus_pass: dict[str, dict]
+    latest_bus_pass: dict[str, dict[str, str]]
 
 ApproachInfoResponse = RootModel[Approach]
 

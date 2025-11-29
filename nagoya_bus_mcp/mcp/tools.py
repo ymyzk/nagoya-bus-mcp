@@ -65,8 +65,8 @@ class StopApproachInfo(BaseModel):
 
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
-_cached_route_masters: dict[str, dict] | None = None
-_cached_busstops: dict[int, dict] | None = None
+_cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]]] | None = None
+_cached_busstops: dict[int, dict[str, dict[str, str]]] | None = None
 
 
 async def _get_station_names(client: Client) -> dict[str, int]:
@@ -85,7 +85,7 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
     return _cached_station_numbers
 
 
-async def _get_route_master(client: Client, route_code: str) -> dict:
+async def _get_route_master(client: Client, route_code: str) -> dict[str, dict[str, dict[str, str]]]:
     """Get route master information from the API."""
     global _cached_route_masters  # noqa: PLW0603
     if _cached_route_masters is None:
@@ -115,7 +115,7 @@ async def _get_realtime_approach(client: Client, route_code: str) -> list[dict[s
     return approach_response
 
 
-async def _get_busstops(client: Client, station_number: int) -> dict:
+async def _get_busstops(client: Client, station_number: int) -> dict[str, dict[str, str]]:
     """Get bus stop information from the API."""
     global _cached_busstops  # noqa: PLW0603
     if _cached_busstops is None:
@@ -215,13 +215,12 @@ async def get_busstop_info(ctx: Context, station_number: int) -> BusstopInfoResp
     client = ctx.request_context.lifespan_context.bus_client
 
     log.info("Getting bus stop information for station number %s", station_number)
-    busstop_info = await _get_busstops(client, station_number)
-    if not busstop_info:
+    busstop_data = await _get_busstops(client, station_number)
+    if not busstop_data:
         log.error("No bus stop information found for station number %s", station_number)
         return None
 
-    busstop_info = BusstopInfoResponse.model_validate(busstop_info)
-    return busstop_info
+    return BusstopInfoResponse.model_validate(busstop_data)
 
 async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
     """Get route master information for a given route code."""
