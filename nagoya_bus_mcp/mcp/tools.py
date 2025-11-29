@@ -60,7 +60,6 @@ class BusstopInfoResponse(BaseModel):
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 _cached_route_masters: dict[str, dict] | None = None
-_cached_realtime_approach: dict[str, dict] | None = None
 _cached_busstops: dict[int, dict] | None = None
 
 
@@ -92,12 +91,7 @@ async def _get_route_master(client: Client, route_code: str):
 
 async def _get_realtime_approach(client: Client, route_code: str):
     """Get real-time approach information from the API."""
-    global _cached_realtime_approach  # noqa: PLW0603
-    if _cached_realtime_approach is None:
-        _cached_realtime_approach = {}
-    if route_code not in _cached_realtime_approach:
-        _cached_realtime_approach[route_code] = (await client.get_realtime_approach(route_code)).root
-    return _cached_realtime_approach[route_code]
+    return (await client.get_realtime_approach(route_code)).root
 
 
 async def _get_busstops(client: Client, station_number: int):
