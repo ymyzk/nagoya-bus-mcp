@@ -59,6 +59,9 @@ class BusstopInfoResponse(BaseModel):
 
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
+_cached_route_masters: dict[str, dict] | None = None
+_cached_realtime_approach: dict[str, dict] | None = None
+_cached_busstops: dict[int, dict] | None = None
 
 
 async def _get_station_names(client: Client) -> dict[str, int]:
@@ -75,6 +78,36 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
             num: name for name, num in (await _get_station_names(client)).items()
         }
     return _cached_station_numbers
+
+
+async def _get_route_master(client: Client, route_code: str):
+    """Get route master information from the API."""
+    global _cached_route_masters  # noqa: PLW0603
+    if _cached_route_masters is None:
+        _cached_route_masters = {}
+    if route_code not in _cached_route_masters:
+        _cached_route_masters[route_code] = (await client.get_routes(route_code)).root
+    return _cached_route_masters[route_code]
+
+
+async def _get_realtime_approach(client: Client, route_code: str):
+    """Get real-time approach information from the API."""
+    global _cached_realtime_approach  # noqa: PLW0603
+    if _cached_realtime_approach is None:
+        _cached_realtime_approach = {}
+    if route_code not in _cached_realtime_approach:
+        _cached_realtime_approach[route_code] = (await client.get_realtime_approach(route_code)).root
+    return _cached_realtime_approach[route_code]
+
+
+async def _get_busstops(client: Client, station_number: int):
+    """Get bus stop information from the API."""
+    global _cached_busstops  # noqa: PLW0603
+    if _cached_busstops is None:
+        _cached_busstops = {}
+    if station_number not in _cached_busstops:
+        _cached_busstops[station_number] = (await client.get_busstops(station_number)).root
+    return _cached_busstops[station_number]
 
 
 async def get_station_number(
@@ -161,10 +194,12 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-async def get_busstop_info(station_number: int) -> BusstopInfoResponse | None:
+async def get_busstop_info(ctx: Context, station_number: int) -> BusstopInfoResponse | None:
     """Get bus stop information for a given station number."""
+    client = ctx.request_context.lifespan_context.bus_client
+
     log.info("Getting bus stop information for station number %s", station_number)
-    busstop_info = (await client.get_busstops(station_number)).root
+    busstop_info = await _get_busstops(client, station_number)
     if not busstop_info:
         log.error("No bus stop information found for station number %s", station_number)
         return None
@@ -178,23 +213,40 @@ async def get_busstop_info(station_number: int) -> BusstopInfoResponse | None:
     )
 
 
-async def get_route_master(route_code: str) -> RouteInfoResponse | None:
+async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
     """Get route master information for a given route code."""
+    client = ctx.request_context.lifespan_context.bus_client
+
     log.info("Getting route master information for route code %s", route_code)
 
-    route_master = (await client.get_routes(route_code)).root
+    route_master = await _get_route_master(client, route_code)
     if not route_master:
         log.error("No route master information found for route code %s", route_code)
         return None
 
-    return RouteInfoResponse.model_validate(route_master.model_dump())
+    return RouteInfoResponse(
+        to=route_master.to,
+        from_=route_master.from_,
+        direction=route_master.direction,
+        no=route_master.no,
+        article=route_master.article,
+        keito=route_master.keito,
+        rosen=route_master.rosen,
+        busstops=route_master.busstops,
+    )
 
 
-async def get_approach_info(route_code: str) -> dict | None:
+async def get_approach_info(ctx: Context, route_code: str) -> dict | None:
     """Get real-time approach information for a given route code."""
+    client = ctx.request_context.lifespan_context.bus_client
+
     log.info("Getting real-time approach information for route code %s", route_code)
 
-    approach_info = (await client.get_realtime_approach(route_code)).root
+    approach_info = await _get_realtime_approach(client, route_code)
+    if not approach_info:
+        log.error("No approach information found for route code %s", route_code)
+        return None
+
     latest_bus_pass = approach_info.latest_bus_pass
     log.info("Latest bus pass data: %s", latest_bus_pass)
     response = {}
