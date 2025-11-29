@@ -6,6 +6,7 @@ import pytest
 from nagoya_bus_mcp.mcp.server import mcp_server
 
 NAGOYA_STATION_NUMBER = 41200
+ROUTE_CODE = "1123002"
 
 
 @pytest.mark.asyncio
@@ -123,4 +124,103 @@ async def test_get_timetable_all_entries_have_valid_time_format() -> None:
 async def test_get_timetable_not_found() -> None:
     async with Client(mcp_server) as client:
         result = await client.call_tool("get_timetable", {"station_number": 123456789})
+        assert result.data is None, "Expected None for non-existent station number"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_route_master_succeeds_and_has_expected_structure() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("get_route_master", {"route_code": ROUTE_CODE})
+        data = result.data
+
+        # Basic structure checks
+        assert isinstance(data, dict)
+        assert data["to"] == "栄"
+        assert data["from_"] == "中川車庫前"
+        assert data["direction"] == "2"
+        assert data["no"] == "1400"
+        assert data["article"] == ""
+        assert data["keito"] == "1123"
+        assert isinstance(data["busstops"], list)
+        assert len(data["busstops"]) > 0
+        assert all(isinstance(s, str) and s for s in data["busstops"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_route_master_not_found() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("get_route_master", {"route_code": "9999999"})
+        assert result.data is None, "Expected None for non-existent route code"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_approach_info_succeeds_and_has_expected_structure() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("get_approach_info", {"route_code": ROUTE_CODE})
+        data = result.data
+
+        # Basic structure checks
+        assert isinstance(data, list)
+        assert len(data) > 0
+
+        approach = data[0]
+        assert {
+            "stop_id",
+            "passed_time",
+            "car_code",
+        }.issubset(approach.keys())
+        assert isinstance(approach["stop_id"], str)
+        assert isinstance(approach["passed_time"], str)
+        assert isinstance(approach["car_code"], str)
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_approach_info_not_found() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool("get_approach_info", {"route_code": "9999999"})
+        assert result.data == [], "Expected empty list for non-existent route code"
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_busstop_info_succeeds_and_has_expected_structure() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool(
+            "get_busstop_info", {"station_number": NAGOYA_STATION_NUMBER}
+        )
+        data = result.data
+
+        # Basic structure checks
+        assert isinstance(data, dict)
+        assert data["name"] == "名古屋駅"
+        assert data["kana"] == "なごやえき"
+        assert isinstance(data["poles"], list)
+        assert len(data["poles"]) > 0
+
+        pole = data["poles"][0]
+        assert {
+            "code",
+            "bcode",
+            "noriba",
+            "route_codes",
+        }.issubset(pole.keys())
+        assert isinstance(pole["code"], str)
+        assert isinstance(pole["bcode"], str)
+        assert isinstance(pole["noriba"], str)
+        assert isinstance(pole["route_codes"], list)
+        assert len(pole["route_codes"]) > 0
+        assert all(isinstance(rc, str) and rc for rc in pole["route_codes"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_busstop_info_not_found() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool(
+            "get_busstop_info", {"station_number": 123456789}
+        )
         assert result.data is None, "Expected None for non-existent station number"

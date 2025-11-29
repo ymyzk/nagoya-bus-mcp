@@ -129,7 +129,7 @@ class Client:
         response.raise_for_status()
         return DiagramResponse.model_validate(response.json())
 
-    async def get_busstops(self, station_number: int) -> BusstopResponse:
+    async def get_busstops(self, station_number: int) -> BusstopResponse | None:
         """Get bus stop information for a specific station.
 
         Args:
@@ -141,33 +141,62 @@ class Client:
         url = f"/BUS_SEKKIN/master_json/busstops/{parsed_station_number}.json"
         response = await self.client.get(url)
         response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent bus stops)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
         return BusstopResponse.model_validate(response.json())
 
-    async def get_routes(self, route_code: str) -> RouteResponse:
+    async def get_routes(self, route_code: str) -> RouteResponse | None:
         """Get route master information for a specific route.
 
         Args:
             route_code: The route code to get the master information for
         Returns:
-            dict: The route master information data
+            dict: The route master information data, or None if not found
         """
         url = f"/BUS_SEKKIN/master_json/keitos/{route_code}.json"
         response = await self.client.get(url)
         response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent routes)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
         return RouteResponse.model_validate(response.json())
 
-    async def get_realtime_approach(self, route_code: str) -> ApproachInfoResponse:
+    async def get_realtime_approach(
+        self, route_code: str
+    ) -> ApproachInfoResponse | None:
         """Get real-time approach information for a specific bus.
 
         Args:
             route_code: The route code to get the real-time approach information for
         Returns:
-            dict: The real-time approach information data
+            dict: The real-time approach information data, or None if not found
         """
         timestamp = datetime.now(tz=UTC).timestamp()
         url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
         response = await self.client.get(url)
         response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent routes)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
         return ApproachInfoResponse.model_validate(response.json())
 
 

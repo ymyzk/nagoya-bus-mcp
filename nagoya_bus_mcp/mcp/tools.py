@@ -65,8 +65,10 @@ class StopApproachInfo(BaseModel):
 
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
-_cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]]] | None = None
-_cached_busstops: dict[int, dict[str, dict[str, str]]] | None = None
+_cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]] | None] | None = (
+    None
+)
+_cached_busstops: dict[int, dict[str, dict[str, str]] | None] | None = None
 
 
 async def _get_station_names(client: Client) -> dict[str, int]:
@@ -87,13 +89,16 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
 
 async def _get_route_master(
     client: Client, route_code: str
-) -> dict[str, dict[str, dict[str, str]]]:
+) -> dict[str, dict[str, dict[str, str]]] | None:
     """Get route master information from the API."""
     global _cached_route_masters  # noqa: PLW0603
     if _cached_route_masters is None:
         _cached_route_masters = {}
     if route_code not in _cached_route_masters:
         route_response = await client.get_routes(route_code)
+        if route_response is None:
+            _cached_route_masters[route_code] = None
+            return None
         _cached_route_masters[route_code] = route_response.root.model_dump()
     return _cached_route_masters[route_code]
 
@@ -104,7 +109,7 @@ async def _get_realtime_approach(
     """Get real-time approach information from the API."""
     response = await client.get_realtime_approach(route_code)
     approach_response = []
-    if not response:
+    if response is None or not response:
         return []
 
     for stop_id, info in response.root.latest_bus_pass.items():
@@ -119,13 +124,16 @@ async def _get_realtime_approach(
 
 async def _get_busstops(
     client: Client, station_number: int
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, str]] | None:
     """Get bus stop information from the API."""
     global _cached_busstops  # noqa: PLW0603
     if _cached_busstops is None:
         _cached_busstops = {}
     if station_number not in _cached_busstops:
         busstop_response = await client.get_busstops(station_number)
+        if busstop_response is None:
+            _cached_busstops[station_number] = None
+            return None
         _cached_busstops[station_number] = busstop_response.root.model_dump()
     return _cached_busstops[station_number]
 
