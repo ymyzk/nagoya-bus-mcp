@@ -33,6 +33,30 @@ class TimeTableResponse(BaseModel):
     url: str
 
 
+class PoleInfoResponse(BaseModel):
+    route_codes: Annotated[list[str], Field(description="路線コードのリスト")]
+    code: Annotated[str, Field(description="ポールコード")]
+    bcode: Annotated[str, Field(description="バスコード")]
+    noriba: Annotated[str, Field(description="乗り場名")]
+
+
+class RouteInfoResponse(BaseModel):
+    to: Annotated[str, Field(description="行き先")]
+    from_: Annotated[str, Field(description="出発地")]
+    direction: Annotated[str, Field(description="方向")]
+    no: Annotated[str, Field(description="路線番号")]
+    article: Annotated[str, Field(description="記事")]
+    keito: Annotated[str, Field(description="系統コード")]
+    rosen: Annotated[str, Field(description="路線名")]
+    busstops: Annotated[list[str], Field(description="バス停のリスト")]
+
+
+class BusstopInfoResponse(BaseModel):
+    poles: Annotated[list[PoleInfoResponse], Field(description="乗り場のリスト")]
+    name: Annotated[str, Field(description="バス停名")]
+    kana: Annotated[str, Field(description="バス停名（カナ）")]
+
+
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 
@@ -129,3 +153,50 @@ async def get_timetable(station_number: int) -> TimeTableResponse | None:
         station_number=station_number,
         url=f"{client.base_url}/jp/pc/bus/timetable_list.html?name={station_name}&toname=",
     )
+
+
+async def get_busstop_info(station_number: int) -> BusstopInfoResponse | None:
+    """Get bus stop information for a given station number."""
+    log.info("Getting bus stop information for station number %s", station_number)
+    busstop_info = (await client.get_busstops(station_number)).root
+    if not busstop_info:
+        log.error("No bus stop information found for station number %s", station_number)
+        return None
+
+    poles = [PoleInfoResponse.model_validate(pole.model_dump()) for pole in busstop_info.poles]
+
+    return BusstopInfoResponse(
+        poles=poles,
+        name=busstop_info.name,
+        kana=busstop_info.kana,
+    )
+
+
+async def get_route_master(route_code: str) -> RouteInfoResponse | None:
+    """Get route master information for a given route code."""
+    log.info("Getting route master information for route code %s", route_code)
+
+    route_master = (await client.get_routes(route_code)).root
+    if not route_master:
+        log.error("No route master information found for route code %s", route_code)
+        return None
+
+    return RouteInfoResponse.model_validate(route_master.model_dump())
+
+
+async def get_approach_info(route_code: str) -> dict | None:
+    """Get real-time approach information for a given route code."""
+    log.info("Getting real-time approach information for route code %s", route_code)
+
+    approach_info = (await client.get_realtime_approach(route_code)).root
+    latest_bus_pass = approach_info.latest_bus_pass
+    log.info("Latest bus pass data: %s", latest_bus_pass)
+    response = {}
+    # remove '/' from dict keys
+    for stop in list(latest_bus_pass):
+        if '/' in stop:
+            new_key = stop.replace('/', '')
+            response[new_key] = latest_bus_pass[stop]
+        else:
+            response[stop] = latest_bus_pass[stop]
+    return response

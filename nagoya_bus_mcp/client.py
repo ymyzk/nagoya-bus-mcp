@@ -1,7 +1,7 @@
 """HTTP client for Nagoya Bus API."""
 
 import httpx
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 StationNamesResponse = RootModel[dict[str, int]]
 Diagram = RootModel[dict[str, dict[int, list[int]]]]
@@ -16,6 +16,54 @@ class DiagramRoute(BaseModel):
 
 
 DiagramResponse = RootModel[dict[str, list[DiagramRoute]]]
+
+
+class Pole(BaseModel):
+    """Pole information model."""
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    route_codes: list[str] = Field(alias="KEITOS")
+    code: str = Field(alias="CODE")
+    bcode: str = Field(alias="BCODE")
+    noriba: str = Field(alias="NORIBA")
+
+
+class Busstop(BaseModel):
+    """Bus stop information model."""
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    poles: list[Pole] = Field(alias="POLES")
+    name: str = Field(alias="NAME")
+    kana: str = Field(alias="KANA")
+
+
+BusstopResponse = RootModel[Busstop]
+
+
+class Route(BaseModel):
+    """Route master information model."""
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    to: str
+    from_: str = Field(alias="FROM")
+    direction: str
+    no: str
+    article: str
+    keito: str
+    rosen: str
+    busstops: list[str]
+
+
+RouteResponse = RootModel[Route]
+
+
+class Approach(BaseModel):
+    """Real-time approach information model."""
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    latest_bus_pass: dict = Field(alias="LATEST_BUS_PASS")
+
+ApproachInfoResponse = RootModel[Approach]
 
 
 class Client:
@@ -58,6 +106,48 @@ class Client:
         response = await self.client.get(url)
         response.raise_for_status()
         return DiagramResponse.model_validate(response.json())
+
+    async def get_busstops(self, station_number: int) -> BusstopResponse:
+        """Get bus stop information for a specific station.
+
+        Args:
+            station_number: The station number to get bus stop information for
+        Returns:
+            list[RouteInfo]: List of route information for the station
+        """
+        parsed_station_number = str(station_number).zfill(5)
+        url = f"/BUS_SEKKIN/master_json/busstops/{parsed_station_number}.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+        return BusstopResponse.model_validate(response.json())
+
+
+    async def get_routes(self, route_code: str) -> RouteResponse:
+        """Get route master information for a specific route.
+
+        Args:
+            route_code: The route code to get the master information for
+        Returns:
+            dict: The route master information data
+        """
+        url = f"/BUS_SEKKIN/master_json/keitos/{route_code}.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+        return RouteResponse.model_validate(response.json())
+
+
+    async def get_realtime_approach(self, route_code: str) -> ApproachInfoResponse:
+        """Get real-time approach information for a specific bus.
+
+        Args:
+            route_code: The route code to get the real-time approach information for
+        Returns:
+            dict: The real-time approach information data
+        """
+        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+        return ApproachInfoResponse.model_validate(response.json())
 
 
 if __name__ == "__main__":
