@@ -178,5 +178,8 @@ if __name__ == "__main__":
         async with Client() as client:
             print(await client.get_station_names())
             print(await client.get_station_diagram(22460))
+            print(await client.get_busstops(22460))
+            print(await client.get_routes("1123002"))
+            print(await client.get_realtime_approach("1123002"))
 
     asyncio.run(main())
