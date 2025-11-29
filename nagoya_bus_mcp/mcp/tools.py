@@ -57,6 +57,12 @@ class BusstopInfoResponse(BaseModel):
     kana: Annotated[str, Field(description="バス停名（カナ）")]
 
 
+class StopApproachInfo(BaseModel):
+    stop_id: Annotated[str, Field(description="停留所ID")]
+    passed_time: Annotated[str, Field(description="通過時刻（HH:MM形式）")]
+    car_code: Annotated[str, Field(description="車両コード")]
+
+
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 _cached_route_masters: dict[str, dict] | None = None
@@ -79,28 +85,44 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
     return _cached_station_numbers
 
 
-async def _get_route_master(client: Client, route_code: str):
+async def _get_route_master(client: Client, route_code: str) -> dict:
     """Get route master information from the API."""
     global _cached_route_masters  # noqa: PLW0603
     if _cached_route_masters is None:
         _cached_route_masters = {}
     if route_code not in _cached_route_masters:
-        _cached_route_masters[route_code] = (await client.get_routes(route_code)).root
+        route_response = await client.get_routes(route_code)
+        _cached_route_masters[route_code] = route_response.root.model_dump()
     return _cached_route_masters[route_code]
 
 
-async def _get_realtime_approach(client: Client, route_code: str):
+async def _get_realtime_approach(client: Client, route_code: str) -> list[dict[str, str]]:
     """Get real-time approach information from the API."""
-    return (await client.get_realtime_approach(route_code)).root
+    response = await client.get_realtime_approach(route_code)
+    approach_response = []
+    if not response:
+        return []
+    
+    for stop_id, info in response.root.latest_bus_pass.items():
+        stop_approach = {}
+        stop_approach['stop_id'] = stop_id.replace('/', '')
+        cache_approach = [
+            {'car_code': k, 'passed_time': v} for k, v in info.items()
+        ]
+        stop_approach['passed_time'] = cache_approach[0]['passed_time']
+        stop_approach['car_code'] = cache_approach[0]['car_code']
+        approach_response.append(stop_approach)
+    return approach_response
 
 
-async def _get_busstops(client: Client, station_number: int):
+async def _get_busstops(client: Client, station_number: int) -> dict:
     """Get bus stop information from the API."""
     global _cached_busstops  # noqa: PLW0603
     if _cached_busstops is None:
         _cached_busstops = {}
     if station_number not in _cached_busstops:
-        _cached_busstops[station_number] = (await client.get_busstops(station_number)).root
+        busstop_response = await client.get_busstops(station_number)
+        _cached_busstops[station_number] = busstop_response.root.model_dump()
     return _cached_busstops[station_number]
 
 
@@ -198,14 +220,8 @@ async def get_busstop_info(ctx: Context, station_number: int) -> BusstopInfoResp
         log.error("No bus stop information found for station number %s", station_number)
         return None
 
-    poles = [PoleInfoResponse.model_validate(pole.model_dump()) for pole in busstop_info.poles]
-
-    return BusstopInfoResponse(
-        poles=poles,
-        name=busstop_info.name,
-        kana=busstop_info.kana,
-    )
-
+    busstop_info = BusstopInfoResponse.model_validate(busstop_info)
+    return busstop_info
 
 async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
     """Get route master information for a given route code."""
@@ -218,19 +234,10 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
         log.error("No route master information found for route code %s", route_code)
         return None
 
-    return RouteInfoResponse(
-        to=route_master.to,
-        from_=route_master.from_,
-        direction=route_master.direction,
-        no=route_master.no,
-        article=route_master.article,
-        keito=route_master.keito,
-        rosen=route_master.rosen,
-        busstops=route_master.busstops,
-    )
+    return RouteInfoResponse.model_validate(route_master)
 
 
-async def get_approach_info(ctx: Context, route_code: str) -> dict | None:
+async def get_approach_info(ctx: Context, route_code: str) -> list[StopApproachInfo]:
     """Get real-time approach information for a given route code."""
     client = ctx.request_context.lifespan_context.bus_client
 
@@ -239,16 +246,9 @@ async def get_approach_info(ctx: Context, route_code: str) -> dict | None:
     approach_info = await _get_realtime_approach(client, route_code)
     if not approach_info:
         log.error("No approach information found for route code %s", route_code)
-        return None
+        return []
 
-    latest_bus_pass = approach_info.latest_bus_pass
+    latest_bus_pass = approach_info
     log.info("Latest bus pass data: %s", latest_bus_pass)
-    response = {}
-    # remove '/' from dict keys
-    for stop in list(latest_bus_pass):
-        if '/' in stop:
-            new_key = stop.replace('/', '')
-            response[new_key] = latest_bus_pass[stop]
-        else:
-            response[stop] = latest_bus_pass[stop]
+    response = [StopApproachInfo.model_validate(info) for info in latest_bus_pass]
     return response

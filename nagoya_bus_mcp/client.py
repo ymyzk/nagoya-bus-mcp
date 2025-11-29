@@ -5,6 +5,7 @@ from typing import Self
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, RootModel
+from datetime import datetime
 
 StationNamesResponse = RootModel[dict[str, int]]
 Diagram = RootModel[dict[str, dict[int, list[int]]]]
@@ -64,7 +65,7 @@ class Approach(BaseModel):
     """Real-time approach information model."""
     model_config = ConfigDict(alias_generator=str.upper)
 
-    latest_bus_pass: dict = Field(alias="LATEST_BUS_PASS")
+    latest_bus_pass: dict[str, dict]
 
 ApproachInfoResponse = RootModel[Approach]
 
@@ -160,7 +161,8 @@ class Client:
         Returns:
             dict: The real-time approach information data
         """
-        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json"
+        timestamp = datetime.now().timestamp()
+        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
         response = await self.client.get(url)
         response.raise_for_status()
         return ApproachInfoResponse.model_validate(response.json())
