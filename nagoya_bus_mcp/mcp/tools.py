@@ -54,12 +54,12 @@ class RouteInfoResponse(BaseModel):
 class BusstopInfoResponse(BaseModel):
     poles: Annotated[list[PoleInfoResponse], Field(description="乗り場のリスト")]
     name: Annotated[str, Field(description="バス停名")]
-    kana: Annotated[str, Field(description="バス停名（カナ）")]
+    kana: Annotated[str, Field(description="バス停名(カナ)")]
 
 
 class StopApproachInfo(BaseModel):
     stop_id: Annotated[str, Field(description="停留所ID")]
-    passed_time: Annotated[str, Field(description="通過時刻（HH:MM形式）")]
+    passed_time: Annotated[str, Field(description="通過時刻(HH:MM形式)")]
     car_code: Annotated[str, Field(description="車両コード")]
 
 
@@ -85,7 +85,9 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
     return _cached_station_numbers
 
 
-async def _get_route_master(client: Client, route_code: str) -> dict[str, dict[str, dict[str, str]]]:
+async def _get_route_master(
+    client: Client, route_code: str
+) -> dict[str, dict[str, dict[str, str]]]:
     """Get route master information from the API."""
     global _cached_route_masters  # noqa: PLW0603
     if _cached_route_masters is None:
@@ -96,26 +98,28 @@ async def _get_route_master(client: Client, route_code: str) -> dict[str, dict[s
     return _cached_route_masters[route_code]
 
 
-async def _get_realtime_approach(client: Client, route_code: str) -> list[dict[str, str]]:
+async def _get_realtime_approach(
+    client: Client, route_code: str
+) -> list[dict[str, str]]:
     """Get real-time approach information from the API."""
     response = await client.get_realtime_approach(route_code)
     approach_response = []
     if not response:
         return []
-    
+
     for stop_id, info in response.root.latest_bus_pass.items():
         stop_approach = {}
-        stop_approach['stop_id'] = stop_id.replace('/', '')
-        cache_approach = [
-            {'car_code': k, 'passed_time': v} for k, v in info.items()
-        ]
-        stop_approach['passed_time'] = cache_approach[0]['passed_time']
-        stop_approach['car_code'] = cache_approach[0]['car_code']
+        stop_approach["stop_id"] = stop_id.replace("/", "")
+        cache_approach = [{"car_code": k, "passed_time": v} for k, v in info.items()]
+        stop_approach["passed_time"] = cache_approach[0]["passed_time"]
+        stop_approach["car_code"] = cache_approach[0]["car_code"]
         approach_response.append(stop_approach)
     return approach_response
 
 
-async def _get_busstops(client: Client, station_number: int) -> dict[str, dict[str, str]]:
+async def _get_busstops(
+    client: Client, station_number: int
+) -> dict[str, dict[str, str]]:
     """Get bus stop information from the API."""
     global _cached_busstops  # noqa: PLW0603
     if _cached_busstops is None:
@@ -210,7 +214,9 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-async def get_busstop_info(ctx: Context, station_number: int) -> BusstopInfoResponse | None:
+async def get_busstop_info(
+    ctx: Context, station_number: int
+) -> BusstopInfoResponse | None:
     """Get bus stop information for a given station number."""
     client = ctx.request_context.lifespan_context.bus_client
 
@@ -221,6 +227,7 @@ async def get_busstop_info(ctx: Context, station_number: int) -> BusstopInfoResp
         return None
 
     return BusstopInfoResponse.model_validate(busstop_data)
+
 
 async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
     """Get route master information for a given route code."""
@@ -249,5 +256,4 @@ async def get_approach_info(ctx: Context, route_code: str) -> list[StopApproachI
 
     latest_bus_pass = approach_info
     log.info("Latest bus pass data: %s", latest_bus_pass)
-    response = [StopApproachInfo.model_validate(info) for info in latest_bus_pass]
-    return response
+    return [StopApproachInfo.model_validate(info) for info in latest_bus_pass]

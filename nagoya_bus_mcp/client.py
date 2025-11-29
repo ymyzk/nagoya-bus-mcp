@@ -1,11 +1,11 @@
 """HTTP client for Nagoya Bus API."""
 
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, RootModel
-from datetime import datetime
 
 StationNamesResponse = RootModel[dict[str, int]]
 Diagram = RootModel[dict[str, dict[int, list[int]]]]
@@ -24,6 +24,7 @@ DiagramResponse = RootModel[dict[str, list[DiagramRoute]]]
 
 class Pole(BaseModel):
     """Pole information model."""
+
     model_config = ConfigDict(alias_generator=str.upper)
 
     route_codes: list[str] = Field(alias="KEITOS")
@@ -34,6 +35,7 @@ class Pole(BaseModel):
 
 class Busstop(BaseModel):
     """Bus stop information model."""
+
     model_config = ConfigDict(alias_generator=str.upper)
 
     poles: list[Pole] = Field(alias="POLES")
@@ -46,6 +48,7 @@ BusstopResponse = RootModel[Busstop]
 
 class Route(BaseModel):
     """Route master information model."""
+
     model_config = ConfigDict(alias_generator=str.upper)
 
     to: str
@@ -63,9 +66,11 @@ RouteResponse = RootModel[Route]
 
 class Approach(BaseModel):
     """Real-time approach information model."""
+
     model_config = ConfigDict(alias_generator=str.upper)
 
     latest_bus_pass: dict[str, dict[str, str]]
+
 
 ApproachInfoResponse = RootModel[Approach]
 
@@ -138,7 +143,6 @@ class Client:
         response.raise_for_status()
         return BusstopResponse.model_validate(response.json())
 
-
     async def get_routes(self, route_code: str) -> RouteResponse:
         """Get route master information for a specific route.
 
@@ -152,7 +156,6 @@ class Client:
         response.raise_for_status()
         return RouteResponse.model_validate(response.json())
 
-
     async def get_realtime_approach(self, route_code: str) -> ApproachInfoResponse:
         """Get real-time approach information for a specific bus.
 
@@ -161,7 +164,7 @@ class Client:
         Returns:
             dict: The real-time approach information data
         """
-        timestamp = datetime.now().timestamp()
+        timestamp = datetime.now(tz=UTC).timestamp()
         url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
         response = await self.client.get(url)
         response.raise_for_status()
