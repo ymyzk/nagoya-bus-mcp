@@ -320,6 +320,7 @@ async def test_get_realtime_approach_success(
         "45055/301": {"NF 0612": "21:24:41"},
         "21010/1E1": {"NF 0612": "21:44:45"},
     }
+    assert result.root.current_bus_positions == {"21010/1E1": {"NF 0612": "21:44:45"}}
 
 
 @pytest.mark.asyncio

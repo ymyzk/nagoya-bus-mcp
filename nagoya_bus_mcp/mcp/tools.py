@@ -63,6 +63,15 @@ class StopApproachInfo(BaseModel):
     car_code: Annotated[str, Field(description="車両コード")]
 
 
+class ApproachInfoResponse(BaseModel):
+    latest_bus_pass: Annotated[
+        list[StopApproachInfo], Field(description="最新のバス通過情報")
+    ]
+    current_bus_positions: Annotated[
+        list[StopApproachInfo], Field(description="現在のバス位置情報")
+    ]
+
+
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 _cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]] | None] | None = (
@@ -105,20 +114,26 @@ async def _get_route_master(
 
 async def _get_realtime_approach(
     client: Client, route_code: str
-) -> list[dict[str, str]]:
+) -> dict[str, list[dict[str, str]]] | None:
     """Get real-time approach information from the API."""
     response = await client.get_realtime_approach(route_code)
-    approach_response = []
+    approach_response = {}
     if response is None or not response:
-        return []
+        return None
 
-    for stop_id, info in response.root.latest_bus_pass.items():
-        stop_approach = {}
-        stop_approach["stop_id"] = stop_id.replace("/", "")
-        cache_approach = [{"car_code": k, "passed_time": v} for k, v in info.items()]
-        stop_approach["passed_time"] = cache_approach[0]["passed_time"]
-        stop_approach["car_code"] = cache_approach[0]["car_code"]
-        approach_response.append(stop_approach)
+    for k, v in response.root.model_dump().items():
+        stop_pass_info = []
+        for stop_id, info in v.items():
+            stop_approach = {}
+            stop_approach["stop_id"] = stop_id.replace("/", "")
+            cache_approach = [
+                {"car_code": ck, "passed_time": cv} for ck, cv in info.items()
+            ]
+            stop_approach["passed_time"] = cache_approach[0]["passed_time"]
+            stop_approach["car_code"] = cache_approach[0]["car_code"]
+            stop_pass_info.append(stop_approach)
+        approach_response[k] = stop_pass_info
+
     return approach_response
 
 
@@ -251,7 +266,7 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
     return RouteInfoResponse.model_validate(route_master)
 
 
-async def get_approach_info(ctx: Context, route_code: str) -> list[StopApproachInfo]:
+async def get_approach(ctx: Context, route_code: str) -> ApproachInfoResponse | None:
     """Get real-time approach information for a given route code."""
     client = ctx.request_context.lifespan_context.bus_client
 
@@ -260,8 +275,6 @@ async def get_approach_info(ctx: Context, route_code: str) -> list[StopApproachI
     approach_info = await _get_realtime_approach(client, route_code)
     if not approach_info:
         log.error("No approach information found for route code %s", route_code)
-        return []
+        return None
 
-    latest_bus_pass = approach_info
-    log.info("Latest bus pass data: %s", latest_bus_pass)
-    return [StopApproachInfo.model_validate(info) for info in latest_bus_pass]
+    return ApproachInfoResponse.model_validate(approach_info)

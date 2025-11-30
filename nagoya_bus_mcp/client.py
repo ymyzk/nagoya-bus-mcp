@@ -70,6 +70,7 @@ class Approach(BaseModel):
     model_config = ConfigDict(alias_generator=str.upper)
 
     latest_bus_pass: dict[str, dict[str, str]]
+    current_bus_positions: dict[str, dict[str, str]]
 
 
 ApproachInfoResponse = RootModel[Approach]
@@ -197,7 +198,14 @@ class Client:
         ):
             return None
 
-        return ApproachInfoResponse.model_validate(response.json())
+        approach_info = {}
+        for k, v in response.json().items():
+            if k == "LATEST_BUS_PASS":
+                approach_info[k] = v
+            else:
+                approach_info["CURRENT_BUS_POSITIONS"] = {k: v}
+
+        return ApproachInfoResponse.model_validate(approach_info)
 
 
 if __name__ == "__main__":
