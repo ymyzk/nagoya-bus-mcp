@@ -63,7 +63,7 @@ class StopApproachInfo(BaseModel):
     car_code: Annotated[str, Field(description="車両コード")]
 
 
-class ApproachInfoResponse(BaseModel):
+class ApproachResponse(BaseModel):
     latest_bus_pass: Annotated[
         list[StopApproachInfo], Field(description="最新のバス通過情報")
     ]
@@ -266,7 +266,7 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
     return RouteInfoResponse.model_validate(route_master)
 
 
-async def get_approach(ctx: Context, route_code: str) -> ApproachInfoResponse | None:
+async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None:
     """Get real-time approach information for a given route code."""
     client = ctx.request_context.lifespan_context.bus_client
 
@@ -277,4 +277,4 @@ async def get_approach(ctx: Context, route_code: str) -> ApproachInfoResponse | 
         log.error("No approach information found for route code %s", route_code)
         return None
 
-    return ApproachInfoResponse.model_validate(approach_info)
+    return ApproachResponse.model_validate(approach_info)
