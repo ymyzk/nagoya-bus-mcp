@@ -8,7 +8,7 @@ from logging import getLogger
 from fastmcp import FastMCP
 
 from nagoya_bus_mcp.client import Client
-from nagoya_bus_mcp.mcp.prompts import ask_timetable
+from nagoya_bus_mcp.mcp.prompts import ask_bus_approach, ask_timetable
 from nagoya_bus_mcp.mcp.tools import (
     get_approach,
     get_busstop_info,
@@ -48,3 +48,4 @@ mcp_server.tool(get_busstop_info)
 mcp_server.tool(get_route_master)
 mcp_server.tool(get_approach)
 mcp_server.prompt(ask_timetable)
+mcp_server.prompt(ask_bus_approach)
