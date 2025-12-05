@@ -117,27 +117,14 @@ class Client:
         return StationNamesResponse.model_validate(response.json())
 
     async def get_station_diagram(self, station_number: int) -> DiagramResponse:
-        """Get timetable diagram for a specific station.
-
-        Args:
-            station_number: The station number to get the diagram for
-
-        Returns:
-            DiagramResponse: Response containing the station's timetable data
-        """
+        """Get timetable diagram for a specific station."""
         url = f"/STATION_DATA/station_infos/diagrams/{station_number}.json"
         response = await self.client.get(url)
         response.raise_for_status()
         return DiagramResponse.model_validate(response.json())
 
     async def get_busstops(self, station_number: int) -> BusstopResponse | None:
-        """Get bus stop information for a specific station.
-
-        Args:
-            station_number: The station number to get bus stop information for
-        Returns:
-            list[RouteInfo]: List of route information for the station
-        """
+        """Get bus stop information for a specific station."""
         parsed_station_number = str(station_number).zfill(5)
         url = f"/BUS_SEKKIN/master_json/busstops/{parsed_station_number}.json"
         response = await self.client.get(url)
@@ -154,13 +141,7 @@ class Client:
         return BusstopResponse.model_validate(response.json())
 
     async def get_routes(self, route_code: str) -> RouteResponse | None:
-        """Get route master information for a specific route.
-
-        Args:
-            route_code: The route code to get the master information for
-        Returns:
-            dict: The route master information data, or None if not found
-        """
+        """Get route master information for a specific route."""
         url = f"/BUS_SEKKIN/master_json/keitos/{route_code}.json"
         response = await self.client.get(url)
         response.raise_for_status()
@@ -178,13 +159,7 @@ class Client:
     async def get_realtime_approach(
         self, route_code: str
     ) -> ApproachInfoResponse | None:
-        """Get real-time approach information for a specific bus.
-
-        Args:
-            route_code: The route code to get the real-time approach information for
-        Returns:
-            dict: The real-time approach information data, or None if not found
-        """
+        """Get real-time approach information for a specific bus."""
         timestamp = datetime.now(tz=UTC).timestamp()
         url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
         response = await self.client.get(url)
