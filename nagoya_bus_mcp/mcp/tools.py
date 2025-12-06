@@ -2,12 +2,15 @@ import difflib
 from functools import reduce
 from logging import getLogger
 from operator import iadd
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated, cast
 
 from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from nagoya_bus_mcp.client import Client
+
+if TYPE_CHECKING:
+    from nagoya_bus_mcp.mcp.server import LifespanContext
 
 log = getLogger(__name__)
 
@@ -78,6 +81,30 @@ _cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]] | None] | 
     None
 )
 _cached_busstops: dict[int, dict[str, dict[str, str]] | None] | None = None
+
+
+def _get_client_from_context(ctx: Context) -> Client:
+    """Extract the bus client from the context.
+
+    Args:
+        ctx: The FastMCP context object.
+
+    Returns:
+        The bus client instance.
+
+    Raises:
+        RuntimeError: If request_context is None.
+    """
+    # See the following documentation on when request_context is available:
+    # https://gofastmcp.com/servers/context#request-context-availability
+    if ctx.request_context is None:
+        msg = (
+            "ctx.request_context is None"
+            " because the MCP session has not been established yet."
+        )
+        raise RuntimeError(msg)
+    lifespan_context = cast("LifespanContext", ctx.request_context.lifespan_context)
+    return lifespan_context.bus_client
 
 
 async def _get_station_names(client: Client) -> dict[str, int]:
@@ -157,7 +184,7 @@ async def get_station_number(
     ctx: Context, station_name: str
 ) -> StationNumberResponse | None:
     """Get station number for a given station name."""
-    client = ctx.request_context.lifespan_context.bus_client
+    client = _get_client_from_context(ctx)
 
     log.info("Getting station number for %s", station_name)
     station_names = await _get_station_names(client)
@@ -195,7 +222,7 @@ async def get_station_number(
 
 async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse | None:
     """Get timetable for a given station."""
-    client = ctx.request_context.lifespan_context.bus_client
+    client = _get_client_from_context(ctx)
 
     station_name = (await _get_station_numbers(client)).get(station_number)
     if station_name is None:
@@ -241,7 +268,7 @@ async def get_busstop_info(
     ctx: Context, station_number: int
 ) -> BusstopInfoResponse | None:
     """Get bus stop information for a given station number."""
-    client = ctx.request_context.lifespan_context.bus_client
+    client = _get_client_from_context(ctx)
 
     log.info("Getting bus stop information for station number %s", station_number)
     busstop_data = await _get_busstops(client, station_number)
@@ -254,7 +281,7 @@ async def get_busstop_info(
 
 async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
     """Get route master information for a given route code."""
-    client = ctx.request_context.lifespan_context.bus_client
+    client = _get_client_from_context(ctx)
 
     log.info("Getting route master information for route code %s", route_code)
 
@@ -268,7 +295,7 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
 
 async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None:
     """Get real-time approach information for a given route code."""
-    client = ctx.request_context.lifespan_context.bus_client
+    client = _get_client_from_context(ctx)
 
     log.info("Getting real-time approach information for route code %s", route_code)
 
