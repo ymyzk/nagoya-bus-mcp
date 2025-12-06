@@ -1,3 +1,5 @@
+"""Entry point for the Nagoya Bus MCP server."""
+
 import asyncio
 import logging
 import sys
@@ -6,6 +8,7 @@ from nagoya_bus_mcp.mcp.server import mcp_server
 
 
 async def run_async() -> None:
+    """Run the MCP server asynchronously."""
     await mcp_server.run_async()
 
 

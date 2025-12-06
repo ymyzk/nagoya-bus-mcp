@@ -28,11 +28,28 @@ except ImportError:
 
 @dataclass
 class LifespanContext:
+    """Lifespan context holding shared resources for the MCP server.
+
+    This context is created at server startup and provides access to the
+    shared HTTP client for Nagoya Bus API requests.
+    """
+
     bus_client: Client
 
 
 @asynccontextmanager
 async def lifespan(_mcp: FastMCP) -> AsyncIterator[LifespanContext]:
+    """Manage the lifespan of the MCP server.
+
+    Creates and maintains a single HTTP client for the Nagoya Bus API
+    that is shared across all tool invocations during the server's lifetime.
+
+    Args:
+        _mcp: The FastMCP server instance (unused).
+
+    Yields:
+        LifespanContext containing the shared bus client.
+    """
     log.info("Starting lifespan and initializing context")
     async with Client() as bus_client:
         context = LifespanContext(bus_client=bus_client)

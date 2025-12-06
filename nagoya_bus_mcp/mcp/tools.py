@@ -1,3 +1,5 @@
+"""MCP tool implementations for Nagoya Bus information queries."""
+
 import difflib
 from functools import reduce
 from logging import getLogger
@@ -16,12 +18,24 @@ log = getLogger(__name__)
 
 
 class StationNumberResponse(BaseModel):
+    """Response model for station number lookup by name.
+
+    Used by the get_station_number tool to return station lookup results,
+    including fuzzy matching outcomes.
+    """
+
     success: bool
     station_name: str | None = None
     station_number: int | None = None
 
 
 class TimeTable(BaseModel):
+    """Timetable information for a single route at a station.
+
+    Contains route details, direction, boarding location, and departure times
+    organized by day of week.
+    """
+
     route: Annotated[str, Field(description="路線")]
     direction: Annotated[str, Field(description="方面")]
     pole: Annotated[str, Field(description="乗り場")]
@@ -31,12 +45,24 @@ class TimeTable(BaseModel):
 
 
 class TimeTableResponse(BaseModel):
+    """Response model for station timetable queries.
+
+    Contains all timetables for different routes operating at a given station,
+    along with the station identifier and reference URL.
+    """
+
     station_number: int
     timetables: list[TimeTable]
     url: str
 
 
 class PoleInfoResponse(BaseModel):
+    """Information about a specific pole (boarding location) at a bus stop.
+
+    Each pole serves one or more routes and has associated codes for
+    identification and real-time tracking.
+    """
+
     keitos: Annotated[list[str], Field(description="路線コードのリスト")]
     code: Annotated[str, Field(description="ポールコード")]
     bcode: Annotated[str, Field(description="バスコード")]
@@ -44,6 +70,12 @@ class PoleInfoResponse(BaseModel):
 
 
 class RouteInfoResponse(BaseModel):
+    """Master information for a specific bus route.
+
+    Contains metadata about the route including origin, destination,
+    route number, and the complete list of stops along the route.
+    """
+
     to: Annotated[str, Field(description="行き先")]
     from_: Annotated[str, Field(description="出発地")]
     direction: Annotated[str, Field(description="方向")]
@@ -55,18 +87,36 @@ class RouteInfoResponse(BaseModel):
 
 
 class BusstopInfoResponse(BaseModel):
+    """Complete information about a bus stop.
+
+    Contains the stop name, phonetic reading, and details about all
+    boarding locations (poles) at the stop.
+    """
+
     poles: Annotated[list[PoleInfoResponse], Field(description="乗り場のリスト")]
     name: Annotated[str, Field(description="バス停名")]
     kana: Annotated[str, Field(description="バス停名(カナ)")]
 
 
 class StopApproachInfo(BaseModel):
+    """Real-time information about a bus passing or approaching a stop.
+
+    Contains the stop identifier, timestamp of the bus passing, and the
+    unique vehicle code for tracking.
+    """
+
     stop_id: Annotated[str, Field(description="停留所ID")]
     passed_time: Annotated[str, Field(description="通過時刻(HH:MM形式)")]
     car_code: Annotated[str, Field(description="車両コード")]
 
 
 class ApproachResponse(BaseModel):
+    """Real-time approach information for buses on a route.
+
+    Provides both historical data (latest bus passages) and current
+    position data for buses actively running on the route.
+    """
+
     latest_bus_pass: Annotated[
         list[StopApproachInfo], Field(description="最新のバス通過情報")
     ]
@@ -183,7 +233,19 @@ async def _get_busstops(
 async def get_station_number(
     ctx: Context, station_name: str
 ) -> StationNumberResponse | None:
-    """Get station number for a given station name."""
+    """Get station number for a given station name using fuzzy matching.
+
+    Attempts exact match first, then falls back to fuzzy matching with 60%
+    similarity threshold if no exact match is found.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        station_name: The station name to look up (e.g., "名古屋駅").
+
+    Returns:
+        StationNumberResponse with success flag and matched station details,
+        or None if the context is unavailable.
+    """
     client = _get_client_from_context(ctx)
 
     log.info("Getting station number for %s", station_name)
@@ -221,7 +283,19 @@ async def get_station_number(
 
 
 async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse | None:
-    """Get timetable for a given station."""
+    """Get formatted timetable information for all routes at a station.
+
+    Retrieves and formats timetable data including routes, directions, boarding
+    locations, and departure times organized by day of week.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        station_number: The station number to query (e.g., 22460).
+
+    Returns:
+        TimeTableResponse with all timetables for the station, or None if the
+        station is not found.
+    """
     client = _get_client_from_context(ctx)
 
     station_name = (await _get_station_numbers(client)).get(station_number)
@@ -267,7 +341,18 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
 async def get_busstop_info(
     ctx: Context, station_number: int
 ) -> BusstopInfoResponse | None:
-    """Get bus stop information for a given station number."""
+    """Get detailed bus stop information including all poles and routes.
+
+    Retrieves pole information, route codes, and boarding location details
+    for a specific bus stop. Results are cached for performance.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        station_number: The station number to query (e.g., 22460).
+
+    Returns:
+        BusstopInfoResponse with stop name and pole details, or None if not found.
+    """
     client = _get_client_from_context(ctx)
 
     log.info("Getting bus stop information for station number %s", station_number)
@@ -280,7 +365,18 @@ async def get_busstop_info(
 
 
 async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
-    """Get route master information for a given route code."""
+    """Get master information for a specific bus route.
+
+    Retrieves route metadata including origin, destination, route number,
+    and the complete list of stops along the route. Results are cached.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        route_code: The route code (keito) to query (e.g., "1123002").
+
+    Returns:
+        RouteInfoResponse with route details and stop list, or None if not found.
+    """
     client = _get_client_from_context(ctx)
 
     log.info("Getting route master information for route code %s", route_code)
@@ -294,7 +390,19 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
 
 
 async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None:
-    """Get real-time approach information for a given route code."""
+    """Get real-time bus approach and position information for a route.
+
+    Provides both historical data (latest bus passages at stops) and current
+    position data for buses actively running on the route.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        route_code: The route code (keito) to query (e.g., "1123002").
+
+    Returns:
+        ApproachResponse with latest passages and current positions, or None
+        if no data is available.
+    """
     client = _get_client_from_context(ctx)
 
     log.info("Getting real-time approach information for route code %s", route_code)
