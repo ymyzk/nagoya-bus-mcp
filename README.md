@@ -42,3 +42,12 @@ $ uvx nagoya-bus-mcp
 # Using Docker
 $ docker run -i --rm ghcr.io/ymyzk/nagoya-bus-mcp
 ```
+
+## For developers
+```
+# Use MCP Inspector
+$ npx @modelcontextprotocol/inspector uv run nagoya-bus-mcp
+
+# Try API client
+$ uv run python -m nagoya_bus_mcp.client
+```

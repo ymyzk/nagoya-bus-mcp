@@ -37,7 +37,7 @@ class TimeTableResponse(BaseModel):
 
 
 class PoleInfoResponse(BaseModel):
-    route_codes: Annotated[list[str], Field(description="路線コードのリスト")]
+    keitos: Annotated[list[str], Field(description="路線コードのリスト")]
     code: Annotated[str, Field(description="ポールコード")]
     bcode: Annotated[str, Field(description="バスコード")]
     noriba: Annotated[str, Field(description="乗り場名")]
@@ -131,11 +131,11 @@ async def _get_route_master(
     if _cached_route_masters is None:
         _cached_route_masters = {}
     if route_code not in _cached_route_masters:
-        route_response = await client.get_routes(route_code)
+        route_response = await client.get_keitos(route_code)
         if route_response is None:
             _cached_route_masters[route_code] = None
             return None
-        _cached_route_masters[route_code] = route_response.root.model_dump()
+        _cached_route_masters[route_code] = route_response.model_dump()
     return _cached_route_masters[route_code]
 
 
@@ -148,7 +148,7 @@ async def _get_realtime_approach(
     if response is None or not response:
         return None
 
-    for k, v in response.root.model_dump().items():
+    for k, v in response.model_dump().items():
         stop_pass_info = []
         for stop_id, info in v.items():
             stop_approach = {}
@@ -172,11 +172,11 @@ async def _get_busstops(
     if _cached_busstops is None:
         _cached_busstops = {}
     if station_number not in _cached_busstops:
-        busstop_response = await client.get_busstops(station_number)
+        busstop_response = await client.get_bus_stops(station_number)
         if busstop_response is None:
             _cached_busstops[station_number] = None
             return None
-        _cached_busstops[station_number] = busstop_response.root.model_dump()
+        _cached_busstops[station_number] = busstop_response.model_dump()
     return _cached_busstops[station_number]
 
 
