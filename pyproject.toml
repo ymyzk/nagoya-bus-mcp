@@ -75,7 +75,7 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["ALL"]
-ignore = ["COM812", "D", "FIX002", "PLC2401", "T201", "TD"]
+ignore = ["COM812", "FIX002", "PLC2401", "T201", "TD"]
 
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
@@ -84,7 +84,19 @@ force-sort-within-sections = true
 "tests/*" = [
     # flake8-bandit: assert
     "S101",
+    # pydocstyle
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
 ]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.setuptools_scm]
 # Workaround for https://github.com/dependabot/dependabot-core/issues/12340

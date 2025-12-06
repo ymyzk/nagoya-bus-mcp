@@ -1,3 +1,10 @@
+"""Integration tests for Nagoya Bus MCP server tools.
+
+These tests make real API calls to the Nagoya City bus API and are marked
+with @pytest.mark.integration. They verify the end-to-end functionality
+of MCP tools against live data.
+"""
+
 import re
 
 from fastmcp import Client
