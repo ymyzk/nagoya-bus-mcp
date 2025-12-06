@@ -17,7 +17,7 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 # Test constants
 NAGOYA_STATION_ID = 41200
 SAKAE_STATION_ID = 21010
-INVLAID_STATION_ID = 99999
+INVALID_STATION_ID = 99999
 ROUTE_CODE = "1123002"
 INVALID_ROUTE_CODE = "9999999"
 
@@ -169,7 +169,7 @@ async def test_get_station_diagram_on_not_found(client_factory: ClientFactory) -
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_station_diagram(INVLAID_STATION_ID)
+        await client.get_station_diagram(INVALID_STATION_ID)
 
 
 @pytest.mark.asyncio
@@ -224,7 +224,7 @@ async def test_get_bus_stops_on_not_found(client_factory: ClientFactory) -> None
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_bus_stops(INVLAID_STATION_ID)
+        await client.get_bus_stops(INVALID_STATION_ID)
 
 
 @pytest.mark.asyncio
