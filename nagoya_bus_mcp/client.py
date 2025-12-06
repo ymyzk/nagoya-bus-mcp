@@ -7,49 +7,53 @@ from typing import Self
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
+# Shared config for models with uppercase field aliases
+_UPPER_ALIAS_CONFIG = ConfigDict(alias_generator=str.upper)
+
+# e.g., {"白川通大津": 22460, "栄": 22010}
 StationNamesResponse = RootModel[dict[str, int]]
+# e.g., {"土曜": {"栄17": {"6": [13, 43], "7": [30, 59]}}}
 Diagram = RootModel[dict[str, dict[int, list[int]]]]
 
 
 class DiagramRoute(BaseModel):
-    model_config = ConfigDict(alias_generator=str.upper)
-    polename: str
-    railway: list[str]
-    stations: list[list[str]]
+    model_config = _UPPER_ALIAS_CONFIG
+    polename: str  # e.g., "1番"
+    railway: list[str]  # e.g., ["名古屋大学(吹上経由)"]
+    stations: list[list[str]]  # e.g., [["矢場町", "名古屋大学"]]
     diagram: Diagram
 
 
+# Key: Route code like 栄17
+# e.g., {"栄17": [DiagramRoute(...)], "栄21": [DiagramRoute(...)]}
 DiagramResponse = RootModel[dict[str, list[DiagramRoute]]]
 
 
-class Pole(BaseModel):
+class BusStopPole(BaseModel):
     """Pole information model."""
 
-    model_config = ConfigDict(alias_generator=str.upper)
+    model_config = _UPPER_ALIAS_CONFIG
 
-    route_codes: list[str] = Field(alias="KEITOS")
-    code: str = Field(alias="CODE")
-    bcode: str = Field(alias="BCODE")
-    noriba: str = Field(alias="NORIBA")
+    keitos: list[str]  # e.g., ["1117001", "1120011"]
+    code: str  # e.g., "5E1"
+    bcode: str  # e.g., "5E1"
+    noriba: str  # e.g., "1番"
 
 
-class Busstop(BaseModel):
+class BusStopResponse(BaseModel):
     """Bus stop information model."""
 
-    model_config = ConfigDict(alias_generator=str.upper)
+    model_config = _UPPER_ALIAS_CONFIG
 
-    poles: list[Pole] = Field(alias="POLES")
-    name: str = Field(alias="NAME")
-    kana: str = Field(alias="KANA")
-
-
-BusstopResponse = RootModel[Busstop]
+    poles: list[BusStopPole]
+    name: str  # e.g., "白川通大津"
+    kana: str  # e.g., "しらかわどおりおおつ"
 
 
-class Route(BaseModel):
+class KeitoResponse(BaseModel):
     """Route master information model."""
 
-    model_config = ConfigDict(alias_generator=str.upper)
+    model_config = _UPPER_ALIAS_CONFIG
 
     to: str
     from_: str = Field(alias="FROM")
@@ -61,19 +65,14 @@ class Route(BaseModel):
     busstops: list[str]
 
 
-RouteResponse = RootModel[Route]
-
-
-class Approach(BaseModel):
+class ApproachInfoResponse(BaseModel):
     """Real-time approach information model."""
 
-    model_config = ConfigDict(alias_generator=str.upper)
+    model_config = _UPPER_ALIAS_CONFIG
 
+    # e.g., {"71145/1E1	{"NS 0341": "14:24:32"}}
     latest_bus_pass: dict[str, dict[str, str]]
     current_bus_positions: dict[str, dict[str, str]]
-
-
-ApproachInfoResponse = RootModel[Approach]
 
 
 class Client:
@@ -123,10 +122,9 @@ class Client:
         response.raise_for_status()
         return DiagramResponse.model_validate(response.json())
 
-    async def get_busstops(self, station_number: int) -> BusstopResponse | None:
+    async def get_bus_stops(self, station_number: int) -> BusStopResponse:
         """Get bus stop information for a specific station."""
-        parsed_station_number = str(station_number).zfill(5)
-        url = f"/BUS_SEKKIN/master_json/busstops/{parsed_station_number}.json"
+        url = f"/BUS_SEKKIN/master_json/busstops/{station_number:05}.json"
         response = await self.client.get(url)
         response.raise_for_status()
 
@@ -138,11 +136,16 @@ class Client:
         ):
             return None
 
-        return BusstopResponse.model_validate(response.json())
+        return BusStopResponse.model_validate(response.json())
 
-    async def get_routes(self, route_code: str) -> RouteResponse | None:
-        """Get route master information for a specific route."""
-        url = f"/BUS_SEKKIN/master_json/keitos/{route_code}.json"
+    async def get_keitos(self, keito_code: str) -> KeitoResponse:
+        """Get route master information for a specific route.
+
+        Args:
+            keito_code: The route code (keito) to fetch information for.
+                        (e.g., "1117001")
+        """
+        url = f"/BUS_SEKKIN/master_json/keitos/{keito_code}.json"
         response = await self.client.get(url)
         response.raise_for_status()
 
@@ -154,15 +157,18 @@ class Client:
         ):
             return None
 
-        return RouteResponse.model_validate(response.json())
+        return KeitoResponse.model_validate(response.json())
 
     async def get_realtime_approach(
-        self, route_code: str
-    ) -> ApproachInfoResponse | None:
+        self, route_code: str, current_time: datetime | None = None
+    ) -> ApproachInfoResponse:
         """Get real-time approach information for a specific bus."""
-        timestamp = datetime.now(tz=UTC).timestamp()
-        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
-        response = await self.client.get(url)
+        if current_time is None:
+            current_time = datetime.now(tz=UTC)
+        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json"
+        response = await self.client.get(
+            url, params={"_": int(current_time.timestamp())}
+        )
         response.raise_for_status()
 
         # Check if response is empty or not JSON (non-existent routes)
@@ -189,9 +195,10 @@ if __name__ == "__main__":
     async def main() -> None:
         async with Client() as client:
             print(await client.get_station_names())
+            # 白川通大津
             print(await client.get_station_diagram(22460))
-            print(await client.get_busstops(22460))
-            print(await client.get_routes("1123002"))
+            print(await client.get_bus_stops(22460))
+            print(await client.get_keitos("1123002"))
             print(await client.get_realtime_approach("1123002"))
 
     asyncio.run(main())

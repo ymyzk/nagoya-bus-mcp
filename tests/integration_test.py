@@ -215,14 +215,14 @@ async def test_get_busstop_info_succeeds_and_has_expected_structure() -> None:
             "code",
             "bcode",
             "noriba",
-            "route_codes",
+            "keitos",
         }.issubset(pole.keys())
         assert isinstance(pole["code"], str)
         assert isinstance(pole["bcode"], str)
         assert isinstance(pole["noriba"], str)
-        assert isinstance(pole["route_codes"], list)
-        assert len(pole["route_codes"]) > 0
-        assert all(isinstance(rc, str) and rc for rc in pole["route_codes"])
+        assert isinstance(pole["keitos"], list)
+        assert len(pole["keitos"]) > 0
+        assert all(isinstance(rc, str) and rc for rc in pole["keitos"])
 
 
 @pytest.mark.asyncio

@@ -202,13 +202,13 @@ async def test_get_busstops_success(
         )
     )
 
-    result = await client.get_busstops(NAGOYA_STATION_ID)
+    result = await client.get_bus_stops(NAGOYA_STATION_ID)
 
     assert result is not None
-    assert result.root.name == "名古屋駅"
-    assert result.root.kana == "なごやえき"
-    assert result.root.poles[0].noriba == "11番"
-    assert result.root.poles[0].route_codes == ["7871001", "7871011"]
+    assert result.name == "名古屋駅"
+    assert result.kana == "なごやえき"
+    assert result.poles[0].noriba == "11番"
+    assert result.poles[0].keitos == ["7871001", "7871011"]
 
 
 @pytest.mark.asyncio
@@ -222,7 +222,7 @@ async def test_get_busstops_http_error(client_factory: ClientFactory) -> None:
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_busstops(NAGOYA_STATION_ID)
+        await client.get_bus_stops(NAGOYA_STATION_ID)
 
 
 @pytest.mark.asyncio
@@ -241,13 +241,13 @@ async def test_get_routes_success(
         )
     )
 
-    result = await client.get_routes(ROUTE_CODE)
+    result = await client.get_keitos(ROUTE_CODE)
 
     assert result is not None
-    assert result.root.to == "栄"
-    assert result.root.from_ == "中川車庫前"
-    assert result.root.keito == "1123"
-    assert result.root.busstops == ["41025701", "52025701", "31090101"]
+    assert result.to == "栄"
+    assert result.from_ == "中川車庫前"
+    assert result.keito == "1123"
+    assert result.busstops == ["41025701", "52025701", "31090101"]
 
 
 @pytest.mark.asyncio
@@ -261,7 +261,7 @@ async def test_get_routes_http_error(client_factory: ClientFactory) -> None:
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_routes(ROUTE_CODE)
+        await client.get_keitos(ROUTE_CODE)
 
 
 @pytest.mark.asyncio
@@ -274,7 +274,7 @@ async def test_get_routes_empty_response(client_factory: ClientFactory) -> None:
         )
     )
 
-    result = await client.get_routes("9999999")
+    result = await client.get_keitos("9999999")
     assert result is None
 
 
@@ -292,7 +292,7 @@ async def test_get_routes_html_response(client_factory: ClientFactory) -> None:
         )
     )
 
-    result = await client.get_routes("9999999")
+    result = await client.get_keitos("9999999")
     assert result is None
 
 
@@ -315,12 +315,12 @@ async def test_get_realtime_approach_success(
     result = await client.get_realtime_approach(ROUTE_CODE)
 
     assert result is not None
-    assert result.root.latest_bus_pass == {
+    assert result.latest_bus_pass == {
         "11015/301": {"NF 0612": "21:31:42"},
         "45055/301": {"NF 0612": "21:24:41"},
         "21010/1E1": {"NF 0612": "21:44:45"},
     }
-    assert result.root.current_bus_positions == {"21010/1E1": {"NF 0612": "21:44:45"}}
+    assert result.current_bus_positions == {"21010/1E1": {"NF 0612": "21:44:45"}}
 
 
 @pytest.mark.asyncio
