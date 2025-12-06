@@ -120,6 +120,7 @@ class Client:
         url = f"/STATION_DATA/station_infos/diagrams/{station_number}.json"
         response = await self.client.get(url)
         response.raise_for_status()
+        self._check_404(response)
         return DiagramResponse.model_validate(response.json())
 
     async def get_bus_stops(self, station_number: int) -> BusStopResponse:
@@ -127,15 +128,7 @@ class Client:
         url = f"/BUS_SEKKIN/master_json/busstops/{station_number:05}.json"
         response = await self.client.get(url)
         response.raise_for_status()
-
-        # Check if response is empty or not JSON (non-existent bus stops)
-        if (
-            not response.content
-            or response.content.strip() == b""
-            or "application/json" not in response.headers.get("content-type", "")
-        ):
-            return None
-
+        self._check_404(response)
         return BusStopResponse.model_validate(response.json())
 
     async def get_keitos(self, keito_code: str) -> KeitoResponse:
@@ -148,15 +141,7 @@ class Client:
         url = f"/BUS_SEKKIN/master_json/keitos/{keito_code}.json"
         response = await self.client.get(url)
         response.raise_for_status()
-
-        # Check if response is empty or not JSON (non-existent routes)
-        if (
-            not response.content
-            or response.content.strip() == b""
-            or "application/json" not in response.headers.get("content-type", "")
-        ):
-            return None
-
+        self._check_404(response)
         return KeitoResponse.model_validate(response.json())
 
     async def get_realtime_approach(
@@ -170,14 +155,7 @@ class Client:
             url, params={"_": int(current_time.timestamp())}
         )
         response.raise_for_status()
-
-        # Check if response is empty or not JSON (non-existent routes)
-        if (
-            not response.content
-            or response.content.strip() == b""
-            or "application/json" not in response.headers.get("content-type", "")
-        ):
-            return None
+        self._check_404(response)
 
         approach_info = {}
         for k, v in response.json().items():
@@ -187,6 +165,23 @@ class Client:
                 approach_info["CURRENT_BUS_POSITIONS"] = {k: v}
 
         return ApproachInfoResponse.model_validate(approach_info)
+
+    @staticmethod
+    def _check_404(response: httpx.Response) -> None:
+        """Check if the response indicates a 404 Not Found error.
+
+        The Nagoya Bus API returns an HTML 404 page with HTTP status code 200
+        for non-existent resources. This function checks for that case and raises
+        an HTTPStatusError if detected.
+        """
+        content_type = response.headers.get("content-type", "")
+        if "text/html" in content_type and b"404 NotFound" in response.content:
+            msg = "404 Not Found"
+            raise httpx.HTTPStatusError(
+                msg,
+                request=response.request,
+                response=response,
+            )
 
 
 if __name__ == "__main__":

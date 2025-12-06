@@ -17,7 +17,9 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 # Test constants
 NAGOYA_STATION_ID = 41200
 SAKAE_STATION_ID = 21010
+INVLAID_STATION_ID = 99999
 ROUTE_CODE = "1123002"
+INVALID_ROUTE_CODE = "9999999"
 
 
 def create_mock_transport(
@@ -26,7 +28,16 @@ def create_mock_transport(
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.path == path:
             return response
-        return httpx.Response(404, text="Not found")
+        # Simulate the server behavior that returns an HTML 404 page with HTTP status
+        # code 200 for non-existent resources.
+        return httpx.Response(
+            status_code=200,
+            content="""<html>
+<head><title>404 NotFound｜名古屋市交通局</title></head>
+<body>404 Not Found</body>
+</html>""".encode(),  # noqa: RUF001
+            headers={"content-type": "text/html"},
+        )
 
     return httpx.MockTransport(handler)
 
@@ -84,12 +95,12 @@ async def test_get_station_names_success(
 
 
 @pytest.mark.asyncio
-async def test_get_station_names_http_error(client_factory: ClientFactory) -> None:
+async def test_get_station_names_on_server_error(client_factory: ClientFactory) -> None:
     """Test HTTP error handling for get_station_names."""
     client = client_factory(
         create_mock_transport(
             path="/STATION_DATA/station_infos/station_name.json",
-            response=httpx.Response(status_code=404),
+            response=httpx.Response(status_code=500),
         )
     )
 
@@ -148,12 +159,28 @@ async def test_get_station_diagram_success(
 
 
 @pytest.mark.asyncio
-async def test_get_station_diagram_http_error(client_factory: ClientFactory) -> None:
+async def test_get_station_diagram_on_not_found(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_station_diagram."""
+    client = client_factory(
+        create_mock_transport(
+            path="/",
+            response=httpx.Response(status_code=200),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_station_diagram(INVLAID_STATION_ID)
+
+
+@pytest.mark.asyncio
+async def test_get_station_diagram_on_server_error(
+    client_factory: ClientFactory,
+) -> None:
     """Test HTTP error handling for get_station_diagram."""
     client = client_factory(
         create_mock_transport(
             path="/STATION_DATA/station_infos/diagrams/41200.json",
-            response=httpx.Response(status_code=404),
+            response=httpx.Response(status_code=500),
         )
     )
 
@@ -162,32 +189,7 @@ async def test_get_station_diagram_http_error(client_factory: ClientFactory) -> 
 
 
 @pytest.mark.asyncio
-async def test_client_cannot_use_after_close(client_factory: ClientFactory) -> None:
-    """Test using client as context manager."""
-    client = client_factory(
-        httpx.MockTransport(lambda _: httpx.Response(status_code=200, json={}))
-    )
-
-    try:
-        # Test that we can use the client and then close it
-        result = await client.get_station_names()
-        assert result.root == {}
-        await client.close()
-
-        # After closing, the client should not be usable
-        with pytest.raises(
-            RuntimeError,
-            match=re.escape("Cannot send a request, as the client has been closed."),
-        ):
-            await client.get_station_names()
-    finally:
-        # Ensure cleanup in case test fails
-        if not client.client.is_closed:
-            await client.close()
-
-
-@pytest.mark.asyncio
-async def test_get_busstops_success(
+async def test_get_bus_stops_success(
     client_factory: ClientFactory,
     fixture_loader: FixtureLoader,
 ) -> None:
@@ -212,12 +214,26 @@ async def test_get_busstops_success(
 
 
 @pytest.mark.asyncio
-async def test_get_busstops_http_error(client_factory: ClientFactory) -> None:
-    """Test HTTP error handling for get_busstops."""
+async def test_get_bus_stops_on_not_found(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_bus_stops."""
+    client = client_factory(
+        create_mock_transport(
+            path="/",
+            response=httpx.Response(status_code=200),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_bus_stops(INVLAID_STATION_ID)
+
+
+@pytest.mark.asyncio
+async def test_get_bus_stops_on_server_error(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_bus_stops."""
     client = client_factory(
         create_mock_transport(
             path="/BUS_SEKKIN/master_json/busstops/41200.json",
-            response=httpx.Response(status_code=404),
+            response=httpx.Response(status_code=500),
         )
     )
 
@@ -251,49 +267,31 @@ async def test_get_routes_success(
 
 
 @pytest.mark.asyncio
-async def test_get_routes_http_error(client_factory: ClientFactory) -> None:
+async def test_get_routes_on_not_found(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_routes."""
+    client = client_factory(
+        create_mock_transport(
+            path="/",
+            response=httpx.Response(status_code=200),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_keitos(INVALID_ROUTE_CODE)
+
+
+@pytest.mark.asyncio
+async def test_get_routes_on_server_error(client_factory: ClientFactory) -> None:
     """Test HTTP error handling for get_routes."""
     client = client_factory(
         create_mock_transport(
             path="/BUS_SEKKIN/master_json/keitos/1123002.json",
-            response=httpx.Response(status_code=404),
+            response=httpx.Response(status_code=500),
         )
     )
 
     with pytest.raises(httpx.HTTPStatusError):
         await client.get_keitos(ROUTE_CODE)
-
-
-@pytest.mark.asyncio
-async def test_get_routes_empty_response(client_factory: ClientFactory) -> None:
-    """Test handling of empty response for get_routes."""
-    client = client_factory(
-        create_mock_transport(
-            path="/BUS_SEKKIN/master_json/keitos/9999999.json",
-            response=httpx.Response(status_code=200, content=b""),
-        )
-    )
-
-    result = await client.get_keitos("9999999")
-    assert result is None
-
-
-@pytest.mark.asyncio
-async def test_get_routes_html_response(client_factory: ClientFactory) -> None:
-    """Test handling of HTML response (404 page) for get_routes."""
-    client = client_factory(
-        create_mock_transport(
-            path="/BUS_SEKKIN/master_json/keitos/9999999.json",
-            response=httpx.Response(
-                status_code=200,
-                content=b"<html><body>404 Not Found</body></html>",
-                headers={"content-type": "text/html"},
-            ),
-        )
-    )
-
-    result = await client.get_keitos("9999999")
-    assert result is None
 
 
 @pytest.mark.asyncio
@@ -324,12 +322,30 @@ async def test_get_realtime_approach_success(
 
 
 @pytest.mark.asyncio
-async def test_get_realtime_approach_http_error(client_factory: ClientFactory) -> None:
+async def test_get_realtime_approach_on_not_found(
+    client_factory: ClientFactory,
+) -> None:
+    """Test HTTP error handling for get_realtime_approach."""
+    client = client_factory(
+        create_mock_transport(
+            path="/",
+            response=httpx.Response(status_code=200),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_realtime_approach(INVALID_ROUTE_CODE)
+
+
+@pytest.mark.asyncio
+async def test_get_realtime_approach_on_server_error(
+    client_factory: ClientFactory,
+) -> None:
     """Test HTTP error handling for get_realtime_approach."""
     client = client_factory(
         create_mock_transport(
             path="/BUS_SEKKIN/realtime_json/1123002.json",
-            response=httpx.Response(status_code=404),
+            response=httpx.Response(status_code=500),
         )
     )
 
@@ -338,36 +354,25 @@ async def test_get_realtime_approach_http_error(client_factory: ClientFactory) -
 
 
 @pytest.mark.asyncio
-async def test_get_realtime_approach_empty_response(
-    client_factory: ClientFactory,
-) -> None:
-    """Test handling of empty response for get_realtime_approach."""
+async def test_client_cannot_use_after_close(client_factory: ClientFactory) -> None:
+    """Test using client as context manager."""
     client = client_factory(
-        create_mock_transport(
-            path="/BUS_SEKKIN/realtime_json/9999999.json",
-            response=httpx.Response(status_code=200, content=b""),
-        )
+        httpx.MockTransport(lambda _: httpx.Response(status_code=200, json={}))
     )
 
-    result = await client.get_realtime_approach("9999999")
-    assert result is None
+    try:
+        # Test that we can use the client and then close it
+        result = await client.get_station_names()
+        assert result.root == {}
+        await client.close()
 
-
-@pytest.mark.asyncio
-async def test_get_realtime_approach_html_response(
-    client_factory: ClientFactory,
-) -> None:
-    """Test handling of HTML response (404 page) for get_realtime_approach."""
-    client = client_factory(
-        create_mock_transport(
-            path="/BUS_SEKKIN/realtime_json/9999999.json",
-            response=httpx.Response(
-                status_code=200,
-                content=b"<html><body>404 Not Found</body></html>",
-                headers={"content-type": "text/html"},
-            ),
-        )
-    )
-
-    result = await client.get_realtime_approach("9999999")
-    assert result is None
+        # After closing, the client should not be usable
+        with pytest.raises(
+            RuntimeError,
+            match=re.escape("Cannot send a request, as the client has been closed."),
+        ):
+            await client.get_station_names()
+    finally:
+        # Ensure cleanup in case test fails
+        if not client.client.is_closed:
+            await client.close()
