@@ -17,6 +17,7 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures"
 # Test constants
 NAGOYA_STATION_ID = 41200
 SAKAE_STATION_ID = 21010
+ROUTE_CODE = "1123002"
 
 
 def create_mock_transport(
@@ -183,3 +184,190 @@ async def test_client_cannot_use_after_close(client_factory: ClientFactory) -> N
         # Ensure cleanup in case test fails
         if not client.client.is_closed:
             await client.close()
+
+
+@pytest.mark.asyncio
+async def test_get_busstops_success(
+    client_factory: ClientFactory,
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test successful retrieval of bus stops."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/busstops/41200.json",
+            response=httpx.Response(
+                status_code=200,
+                json=fixture_loader("busstops_41200.json"),
+            ),
+        )
+    )
+
+    result = await client.get_busstops(NAGOYA_STATION_ID)
+
+    assert result is not None
+    assert result.root.name == "名古屋駅"
+    assert result.root.kana == "なごやえき"
+    assert result.root.poles[0].noriba == "11番"
+    assert result.root.poles[0].route_codes == ["7871001", "7871011"]
+
+
+@pytest.mark.asyncio
+async def test_get_busstops_http_error(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_busstops."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/busstops/41200.json",
+            response=httpx.Response(status_code=404),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_busstops(NAGOYA_STATION_ID)
+
+
+@pytest.mark.asyncio
+async def test_get_routes_success(
+    client_factory: ClientFactory,
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test successful retrieval of routes."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/keitos/1123002.json",
+            response=httpx.Response(
+                status_code=200,
+                json=fixture_loader("routes_1123002.json"),
+            ),
+        )
+    )
+
+    result = await client.get_routes(ROUTE_CODE)
+
+    assert result is not None
+    assert result.root.to == "栄"
+    assert result.root.from_ == "中川車庫前"
+    assert result.root.keito == "1123"
+    assert result.root.busstops == ["41025701", "52025701", "31090101"]
+
+
+@pytest.mark.asyncio
+async def test_get_routes_http_error(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_routes."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/keitos/1123002.json",
+            response=httpx.Response(status_code=404),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_routes(ROUTE_CODE)
+
+
+@pytest.mark.asyncio
+async def test_get_routes_empty_response(client_factory: ClientFactory) -> None:
+    """Test handling of empty response for get_routes."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/keitos/9999999.json",
+            response=httpx.Response(status_code=200, content=b""),
+        )
+    )
+
+    result = await client.get_routes("9999999")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_routes_html_response(client_factory: ClientFactory) -> None:
+    """Test handling of HTML response (404 page) for get_routes."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/keitos/9999999.json",
+            response=httpx.Response(
+                status_code=200,
+                content=b"<html><body>404 Not Found</body></html>",
+                headers={"content-type": "text/html"},
+            ),
+        )
+    )
+
+    result = await client.get_routes("9999999")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_realtime_approach_success(
+    client_factory: ClientFactory,
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test successful retrieval of real-time approach information."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/realtime_json/1123002.json",
+            response=httpx.Response(
+                status_code=200,
+                json=fixture_loader("realtime_approach_1123002.json"),
+            ),
+        )
+    )
+
+    result = await client.get_realtime_approach(ROUTE_CODE)
+
+    assert result is not None
+    assert result.root.latest_bus_pass == {
+        "11015/301": {"NF 0612": "21:31:42"},
+        "45055/301": {"NF 0612": "21:24:41"},
+        "21010/1E1": {"NF 0612": "21:44:45"},
+    }
+    assert result.root.current_bus_positions == {"21010/1E1": {"NF 0612": "21:44:45"}}
+
+
+@pytest.mark.asyncio
+async def test_get_realtime_approach_http_error(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_realtime_approach."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/realtime_json/1123002.json",
+            response=httpx.Response(status_code=404),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_realtime_approach(ROUTE_CODE)
+
+
+@pytest.mark.asyncio
+async def test_get_realtime_approach_empty_response(
+    client_factory: ClientFactory,
+) -> None:
+    """Test handling of empty response for get_realtime_approach."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/realtime_json/9999999.json",
+            response=httpx.Response(status_code=200, content=b""),
+        )
+    )
+
+    result = await client.get_realtime_approach("9999999")
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_get_realtime_approach_html_response(
+    client_factory: ClientFactory,
+) -> None:
+    """Test handling of HTML response (404 page) for get_realtime_approach."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/realtime_json/9999999.json",
+            response=httpx.Response(
+                status_code=200,
+                content=b"<html><body>404 Not Found</body></html>",
+                headers={"content-type": "text/html"},
+            ),
+        )
+    )
+
+    result = await client.get_realtime_approach("9999999")
+    assert result is None

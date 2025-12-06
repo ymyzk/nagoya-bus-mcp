@@ -1,10 +1,11 @@
 """HTTP client for Nagoya Bus API."""
 
+from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
 import httpx
-from pydantic import BaseModel, ConfigDict, RootModel
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 StationNamesResponse = RootModel[dict[str, int]]
 Diagram = RootModel[dict[str, dict[int, list[int]]]]
@@ -19,6 +20,60 @@ class DiagramRoute(BaseModel):
 
 
 DiagramResponse = RootModel[dict[str, list[DiagramRoute]]]
+
+
+class Pole(BaseModel):
+    """Pole information model."""
+
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    route_codes: list[str] = Field(alias="KEITOS")
+    code: str = Field(alias="CODE")
+    bcode: str = Field(alias="BCODE")
+    noriba: str = Field(alias="NORIBA")
+
+
+class Busstop(BaseModel):
+    """Bus stop information model."""
+
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    poles: list[Pole] = Field(alias="POLES")
+    name: str = Field(alias="NAME")
+    kana: str = Field(alias="KANA")
+
+
+BusstopResponse = RootModel[Busstop]
+
+
+class Route(BaseModel):
+    """Route master information model."""
+
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    to: str
+    from_: str = Field(alias="FROM")
+    direction: str
+    no: str
+    article: str
+    keito: str
+    rosen: str
+    busstops: list[str]
+
+
+RouteResponse = RootModel[Route]
+
+
+class Approach(BaseModel):
+    """Real-time approach information model."""
+
+    model_config = ConfigDict(alias_generator=str.upper)
+
+    latest_bus_pass: dict[str, dict[str, str]]
+    current_bus_positions: dict[str, dict[str, str]]
+
+
+ApproachInfoResponse = RootModel[Approach]
 
 
 class Client:
@@ -62,18 +117,70 @@ class Client:
         return StationNamesResponse.model_validate(response.json())
 
     async def get_station_diagram(self, station_number: int) -> DiagramResponse:
-        """Get timetable diagram for a specific station.
-
-        Args:
-            station_number: The station number to get the diagram for
-
-        Returns:
-            DiagramResponse: Response containing the station's timetable data
-        """
+        """Get timetable diagram for a specific station."""
         url = f"/STATION_DATA/station_infos/diagrams/{station_number}.json"
         response = await self.client.get(url)
         response.raise_for_status()
         return DiagramResponse.model_validate(response.json())
+
+    async def get_busstops(self, station_number: int) -> BusstopResponse | None:
+        """Get bus stop information for a specific station."""
+        parsed_station_number = str(station_number).zfill(5)
+        url = f"/BUS_SEKKIN/master_json/busstops/{parsed_station_number}.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent bus stops)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
+        return BusstopResponse.model_validate(response.json())
+
+    async def get_routes(self, route_code: str) -> RouteResponse | None:
+        """Get route master information for a specific route."""
+        url = f"/BUS_SEKKIN/master_json/keitos/{route_code}.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent routes)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
+        return RouteResponse.model_validate(response.json())
+
+    async def get_realtime_approach(
+        self, route_code: str
+    ) -> ApproachInfoResponse | None:
+        """Get real-time approach information for a specific bus."""
+        timestamp = datetime.now(tz=UTC).timestamp()
+        url = f"/BUS_SEKKIN/realtime_json/{route_code}.json?_={int(timestamp)}"
+        response = await self.client.get(url)
+        response.raise_for_status()
+
+        # Check if response is empty or not JSON (non-existent routes)
+        if (
+            not response.content
+            or response.content.strip() == b""
+            or "application/json" not in response.headers.get("content-type", "")
+        ):
+            return None
+
+        approach_info = {}
+        for k, v in response.json().items():
+            if k == "LATEST_BUS_PASS":
+                approach_info[k] = v
+            else:
+                approach_info["CURRENT_BUS_POSITIONS"] = {k: v}
+
+        return ApproachInfoResponse.model_validate(approach_info)
 
 
 if __name__ == "__main__":
@@ -83,5 +190,8 @@ if __name__ == "__main__":
         async with Client() as client:
             print(await client.get_station_names())
             print(await client.get_station_diagram(22460))
+            print(await client.get_busstops(22460))
+            print(await client.get_routes("1123002"))
+            print(await client.get_realtime_approach("1123002"))
 
     asyncio.run(main())
