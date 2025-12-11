@@ -17,6 +17,12 @@ Diagram = RootModel[dict[str, dict[int, list[int]]]]
 
 
 class DiagramRoute(BaseModel):
+    """Timetable diagram for a specific route and pole at a station.
+
+    Contains the pole name, railway direction, station stops, and time diagram
+    organized by day of week and hour.
+    """
+
     model_config = _UPPER_ALIAS_CONFIG
     polename: str  # e.g., "1番"
     railway: list[str]  # e.g., ["名古屋大学(吹上経由)"]
@@ -116,7 +122,17 @@ class Client:
         return StationNamesResponse.model_validate(response.json())
 
     async def get_station_diagram(self, station_number: int) -> DiagramResponse:
-        """Get timetable diagram for a specific station."""
+        """Get timetable diagram for a specific station.
+
+        Args:
+            station_number: The station number (e.g., 22460 for 白川通大津).
+
+        Returns:
+            DiagramResponse: Mapping of route codes to diagram information.
+
+        Raises:
+            httpx.HTTPStatusError: If the station is not found (API returns 404).
+        """
         url = f"/STATION_DATA/station_infos/diagrams/{station_number}.json"
         response = await self.client.get(url)
         response.raise_for_status()
@@ -124,7 +140,17 @@ class Client:
         return DiagramResponse.model_validate(response.json())
 
     async def get_bus_stops(self, station_number: int) -> BusStopResponse:
-        """Get bus stop information for a specific station."""
+        """Get bus stop information for a specific station.
+
+        Args:
+            station_number: The station number (e.g., 22460).
+
+        Returns:
+            BusStopResponse: Bus stop details including poles and route codes.
+
+        Raises:
+            httpx.HTTPStatusError: If the station is not found (API returns 404).
+        """
         url = f"/BUS_SEKKIN/master_json/busstops/{station_number:05}.json"
         response = await self.client.get(url)
         response.raise_for_status()
@@ -135,8 +161,14 @@ class Client:
         """Get route master information for a specific route.
 
         Args:
-            keito_code: The route code (keito) to fetch information for.
-                        (e.g., "1117001")
+            keito_code: The route code (keito) to fetch information for
+                (e.g., "1117001").
+
+        Returns:
+            KeitoResponse: Route metadata including origin, destination, and stops.
+
+        Raises:
+            httpx.HTTPStatusError: If the route is not found (API returns 404).
         """
         url = f"/BUS_SEKKIN/master_json/keitos/{keito_code}.json"
         response = await self.client.get(url)
@@ -147,7 +179,19 @@ class Client:
     async def get_realtime_approach(
         self, route_code: str, current_time: datetime | None = None
     ) -> ApproachInfoResponse:
-        """Get real-time approach information for a specific bus."""
+        """Get real-time approach information for buses on a route.
+
+        Args:
+            route_code: The route code to query (e.g., "1123002").
+            current_time: Optional timestamp for the query. Defaults to current
+                UTC time if not provided.
+
+        Returns:
+            ApproachInfoResponse: Latest bus passages and current positions.
+
+        Raises:
+            httpx.HTTPStatusError: If the route is not found (API returns 404).
+        """
         if current_time is None:
             current_time = datetime.now(tz=UTC)
         url = f"/BUS_SEKKIN/realtime_json/{route_code}.json"
@@ -188,6 +232,7 @@ if __name__ == "__main__":
     import asyncio
 
     async def main() -> None:
+        """Test the client by fetching various data."""
         async with Client() as client:
             print(await client.get_station_names())
             # 白川通大津
