@@ -12,6 +12,7 @@ repos:
         name: Pyrefly (type checking)
         pass_filenames: false
         language: system
+        entry: uv run pyrefly check
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
