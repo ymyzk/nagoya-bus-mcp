@@ -1,5 +1,6 @@
 """MCP tool implementations for Nagoya Bus information queries."""
 
+import asyncio
 import difflib
 from functools import reduce
 from logging import getLogger
@@ -9,7 +10,7 @@ from typing import TYPE_CHECKING, Annotated, cast
 from fastmcp import Context
 from pydantic import BaseModel, Field
 
-from nagoya_bus_mcp.client import Client
+from nagoya_bus_mcp.client import Client, KeitoResponse
 
 if TYPE_CHECKING:
     from nagoya_bus_mcp.mcp.server import LifespanContext
@@ -110,26 +111,42 @@ class StopApproachInfo(BaseModel):
     car_code: Annotated[str, Field(description="車両コード")]
 
 
-class ApproachResponse(BaseModel):
-    """Real-time approach information for buses on a route.
+class RouteBusStopInfo(BaseModel):
+    """Information about a bus stop on a specific route.
 
-    Provides both historical data (latest bus passages) and current
-    position data for buses actively running on the route.
+    Contains the station name and station number.
     """
 
-    latest_bus_pass: Annotated[
-        list[StopApproachInfo], Field(description="最新のバス通過情報")
-    ]
-    current_bus_positions: Annotated[
-        list[StopApproachInfo], Field(description="現在のバス位置情報")
-    ]
+    station_number: int
+    station_name: str
+
+
+class ApproachBusPositionInfo(BaseModel):
+    """Information about a bus position on a specific route.
+
+    Contains the car code, previous stop name, next stop name, and passed time.
+    """
+
+    car_code: str
+    previous_stop_name: str
+    passed_time: Annotated[str, Field(description="通過時刻(HH:MM:SS形式)")]
+    next_stop_name: str
+
+
+class RouteApproachResponse(BaseModel):
+    """Real-time approach information for a specific route.
+
+    Contains the latest bus passage information and current bus positions
+    for the specified route.
+    """
+
+    bus_stops: list[RouteBusStopInfo]
+    bus_positions: list[ApproachBusPositionInfo]
 
 
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
-_cached_route_masters: dict[str, dict[str, dict[str, dict[str, str]]] | None] | None = (
-    None
-)
+_cached_route_masters: dict[str, KeitoResponse] | None = None
 _cached_busstops: dict[int, dict[str, dict[str, str]] | None] | None = None
 
 
@@ -173,30 +190,23 @@ async def _get_station_numbers(client: Client) -> dict[int, str]:
     return _cached_station_numbers
 
 
-async def _get_route_master(
-    client: Client, route_code: str
-) -> dict[str, dict[str, dict[str, str]]] | None:
+async def _get_route_master(client: Client, route_code: str) -> KeitoResponse:
     """Get route master information from the API."""
     global _cached_route_masters  # noqa: PLW0603
     if _cached_route_masters is None:
         _cached_route_masters = {}
     if route_code not in _cached_route_masters:
         route_response = await client.get_keitos(route_code)
-        if route_response is None:
-            _cached_route_masters[route_code] = None
-            return None
-        _cached_route_masters[route_code] = route_response.model_dump()
+        _cached_route_masters[route_code] = route_response
     return _cached_route_masters[route_code]
 
 
 async def _get_realtime_approach(
     client: Client, route_code: str
-) -> dict[str, list[dict[str, str]]] | None:
+) -> dict[str, list[dict[str, str]]]:
     """Get real-time approach information from the API."""
     response = await client.get_realtime_approach(route_code)
     approach_response = {}
-    if response is None or not response:
-        return None
 
     for k, v in response.model_dump().items():
         stop_pass_info = []
@@ -386,10 +396,25 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
         log.error("No route master information found for route code %s", route_code)
         return None
 
-    return RouteInfoResponse.model_validate(route_master)
+    return RouteInfoResponse.model_validate(route_master.model_dump())
 
 
-async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None:
+async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> RouteBusStopInfo:
+    """Resolve bus stop code to station information."""
+    if len(bus_stop_code) < 5 or not bus_stop_code[:5].isdigit():  # noqa: PLR2004
+        msg = f"bus_stop_code must be at least 5 digits, got: {bus_stop_code!r}"
+        raise ValueError(msg)
+    station_number = int(bus_stop_code[:5].lstrip("0"))
+    # TODO: Add pole support
+    # pole = bus_stop_code[5:]  # noqa: ERA001
+    station_name = (await _get_station_numbers(client)).get(station_number)
+    return RouteBusStopInfo(
+        station_number=station_number,
+        station_name=station_name or "不明なバス停",
+    )
+
+
+async def get_approach(ctx: Context, route_code: str) -> RouteApproachResponse | None:
     """Get real-time bus approach and position information for a route.
 
     Provides both historical data (latest bus passages at stops) and current
@@ -400,16 +425,47 @@ async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None
         route_code: The route code (keito) to query (e.g., "1123002").
 
     Returns:
-        ApproachResponse with latest passages and current positions, or None
+        RouteApproachResponse with latest passages and current positions, or None
         if no data is available.
     """
     client = _get_client_from_context(ctx)
 
     log.info("Getting real-time approach information for route code %s", route_code)
 
+    route_master = await _get_route_master(client, route_code)
     approach_info = await _get_realtime_approach(client, route_code)
-    if not approach_info:
+    if not route_master or not approach_info:
         log.error("No approach information found for route code %s", route_code)
         return None
 
-    return ApproachResponse.model_validate(approach_info)
+    bus_stops = await asyncio.gather(
+        *(_resolve_bus_stop(client, bus_stop) for bus_stop in route_master.busstops)
+    )
+
+    bus_positions: list[ApproachBusPositionInfo] = []
+    for current_bus_position in approach_info["current_bus_positions"]:
+        next_stop_id = current_bus_position["stop_id"]
+        next_stop_index = route_master.busstops.index(next_stop_id)
+        if next_stop_index == 0:
+            log.warning(
+                "Next stop is the first stop, skipping as there is no previous stop"
+            )
+            continue
+        previous_stop_id = route_master.busstops[next_stop_index - 1]
+        [next_stop, previous_stop] = await asyncio.gather(
+            _resolve_bus_stop(client, next_stop_id),
+            _resolve_bus_stop(client, previous_stop_id),
+        )
+        bus_positions.append(
+            ApproachBusPositionInfo(
+                car_code=current_bus_position["car_code"],
+                previous_stop_name=previous_stop.station_name,
+                passed_time=current_bus_position["passed_time"],
+                next_stop_name=next_stop.station_name,
+            )
+        )
+
+    return RouteApproachResponse(
+        bus_stops=bus_stops,
+        bus_positions=bus_positions,
+    )

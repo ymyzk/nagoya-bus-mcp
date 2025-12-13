@@ -8,6 +8,7 @@ of MCP tools against live data.
 import re
 
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 import pytest
 
 from nagoya_bus_mcp.mcp.server import mcp_server
@@ -158,8 +159,8 @@ async def test_get_route_master_succeeds_and_has_expected_structure() -> None:
 @pytest.mark.integration
 async def test_get_route_master_not_found() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool("get_route_master", {"route_code": "9999999"})
-        assert result.data is None, "Expected None for non-existent route code"
+        with pytest.raises(ToolError, match="404 Not Found"):
+            await client.call_tool("get_route_master", {"route_code": "9999999"})
 
 
 @pytest.mark.asyncio
@@ -171,34 +172,18 @@ async def test_get_approach_succeeds_and_has_expected_structure() -> None:
 
         # Basic structure checks
         assert isinstance(data, dict)
-
-        latest_pass = data["latest_bus_pass"][0]
-        assert {
-            "stop_id",
-            "passed_time",
-            "car_code",
-        }.issubset(latest_pass.keys())
-        assert isinstance(latest_pass["stop_id"], str)
-        assert isinstance(latest_pass["passed_time"], str)
-        assert isinstance(latest_pass["car_code"], str)
-
-        current_positions = data["current_bus_positions"][0]
-        assert {
-            "stop_id",
-            "passed_time",
-            "car_code",
-        }.issubset(current_positions.keys())
-        assert isinstance(current_positions["stop_id"], str)
-        assert isinstance(current_positions["passed_time"], str)
-        assert isinstance(current_positions["car_code"], str)
+        assert "bus_stops" in data
+        assert "bus_positions" in data
+        assert isinstance(data["bus_stops"], list)
+        assert isinstance(data["bus_positions"], list)
 
 
 @pytest.mark.asyncio
 @pytest.mark.integration
 async def test_get_approach_not_found() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool("get_approach", {"route_code": "9999999"})
-        assert result.data is None, "Expected empty list for non-existent route code"
+        with pytest.raises(ToolError, match="404 Not Found"):
+            await client.call_tool("get_approach", {"route_code": "9999999"})
 
 
 @pytest.mark.asyncio
@@ -236,7 +221,5 @@ async def test_get_busstop_info_succeeds_and_has_expected_structure() -> None:
 @pytest.mark.integration
 async def test_get_busstop_info_not_found() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool(
-            "get_busstop_info", {"station_number": 123456789}
-        )
-        assert result.data is None, "Expected None for non-existent station number"
+        with pytest.raises(ToolError, match="404 Not Found"):
+            await client.call_tool("get_busstop_info", {"station_number": 123456789})
