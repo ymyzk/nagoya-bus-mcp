@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 from types import TracebackType
 from typing import Self
 
+from hishel import AsyncSqliteStorage
+from hishel.httpx import AsyncCacheTransport
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -82,14 +84,47 @@ class ApproachInfoResponse(BaseModel):
 
 
 class Client:
-    """HTTP client for Nagoya Bus API."""
+    """Async HTTP client providing a thin wrapper around the Nagoya Bus API.
+
+    This client is designed to closely mirror the underlying API structure.
+    Due to the design of the wrapped API, there may be inconsistencies in
+    field naming conventions, which are intentionally preserved as-is.
+
+    Supports async context manager protocol for automatic resource cleanup.
+    """
 
     def __init__(
         self,
         base_url: str = "https://www.kotsu.city.nagoya.jp",
         transport: httpx.AsyncBaseTransport | None = None,
+        cache_database_path: str | None = None,
     ) -> None:
-        """Initialize the client with an httpx session."""
+        """Initialize the client with an httpx session.
+
+        Args:
+            base_url: Base URL for the Nagoya Bus API. Defaults to the
+                official Nagoya City bus API endpoint.
+            transport: Optional custom transport for the httpx client.
+                If None, uses the default AsyncHTTPTransport. Useful for
+                testing or customizing connection behavior.
+            cache_database_path: Optional path to the SQLite cache database.
+                If None, the cache will be disabled.
+
+        Note:
+            All requests are automatically cached using hishel's
+            AsyncCacheTransport with SQLite storage, regardless of the
+            provided transport.
+        """
+        if transport is None:
+            transport = httpx.AsyncHTTPTransport()
+        if cache_database_path is not None:
+            transport = AsyncCacheTransport(
+                next_transport=transport,
+                storage=AsyncSqliteStorage(  # pyrefly: ignore[bad-argument-type]
+                    database_path=cache_database_path
+                ),
+            )
+
         self.base_url = base_url
         self.client = httpx.AsyncClient(base_url=base_url, transport=transport)
 
