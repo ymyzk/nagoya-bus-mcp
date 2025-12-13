@@ -53,6 +53,7 @@ nagoya-bus-mcp = "nagoya_bus_mcp.__main__:main"
 dev = [
     "mypy>=1.17.0",
     "pre-commit>=4.2.0",
+    "pyrefly>=0.1.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
     "pytest-randomly>=3.16.0",
@@ -69,6 +70,9 @@ addopts = "--cov -m 'not integration' --strict"
 markers = [
     "integration: mark a test as an integration test",
 ]
+
+[tool.pyrefly]
+project_includes = ["nagoya_bus_mcp", "tests"]
 
 [tool.ruff]
 target-version = "py311"
