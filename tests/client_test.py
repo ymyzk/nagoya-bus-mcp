@@ -322,6 +322,39 @@ async def test_get_realtime_approach_success(
 
 
 @pytest.mark.asyncio
+async def test_get_realtime_approach_multiple_positions(
+    client_factory: ClientFactory,
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test retrieval of approach information with multiple current bus positions."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/realtime_json/1123002.json",
+            response=httpx.Response(
+                status_code=200,
+                json=fixture_loader("realtime_approach_multiple_positions.json"),
+            ),
+        )
+    )
+
+    result = await client.get_realtime_approach(ROUTE_CODE)
+
+    assert result is not None
+    assert result.latest_bus_pass == {
+        "11015/301": {"NF 0612": "21:31:42"},
+        "45055/301": {"NF 0612": "21:24:41"},
+        "21010/1E1": {"NF 0612": "21:44:45"},
+    }
+    # Verify that all three current bus positions are accumulated
+    assert result.current_bus_positions == {
+        "21010/1E1": {"NF 0612": "21:44:45"},
+        "11015/301": {"NF 0612": "21:31:42"},
+        "45055/301": {"NF 0612": "21:24:41"},
+    }
+    assert len(result.current_bus_positions) == 3
+
+
+@pytest.mark.asyncio
 async def test_get_realtime_approach_on_not_found(
     client_factory: ClientFactory,
 ) -> None:
