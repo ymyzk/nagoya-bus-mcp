@@ -97,6 +97,8 @@ force-sort-within-sections = true
     "D105",
     "D106",
     "D107",
+    # pylint: magic-value-comparison
+    "PLR2004",
 ]
 
 [tool.ruff.lint.pydocstyle]

@@ -201,12 +201,13 @@ class Client:
         response.raise_for_status()
         self._check_404(response)
 
-        approach_info = {}
+        approach_info: dict[str, dict[str, str]] = {}
+        approach_info["CURRENT_BUS_POSITIONS"] = {}
         for k, v in response.json().items():
             if k == "LATEST_BUS_PASS":
                 approach_info[k] = v
             else:
-                approach_info["CURRENT_BUS_POSITIONS"] = {k: v}
+                approach_info["CURRENT_BUS_POSITIONS"][k] = v
 
         return ApproachInfoResponse.model_validate(approach_info)
 
