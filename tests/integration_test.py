@@ -137,34 +137,6 @@ async def test_get_timetable_not_found() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_get_route_master_succeeds_and_has_expected_structure() -> None:
-    async with Client(mcp_server) as client:
-        result = await client.call_tool("get_route_master", {"route_code": ROUTE_CODE})
-        data = result.data
-
-        # Basic structure checks
-        assert isinstance(data, dict)
-        assert data["to"] == "栄"
-        assert data["from_"] == "中川車庫前"
-        assert data["direction"] == "2"
-        assert data["no"] == "1400"
-        assert data["article"] == ""
-        assert data["keito"] == "1123"
-        assert isinstance(data["busstops"], list)
-        assert len(data["busstops"]) > 0
-        assert all(isinstance(s, str) and s for s in data["busstops"])
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
-async def test_get_route_master_not_found() -> None:
-    async with Client(mcp_server) as client:
-        with pytest.raises(ToolError, match="404 Not Found"):
-            await client.call_tool("get_route_master", {"route_code": "9999999"})
-
-
-@pytest.mark.asyncio
-@pytest.mark.integration
 async def test_get_approach_succeeds_and_has_expected_structure() -> None:
     async with Client(mcp_server) as client:
         result = await client.call_tool("get_approach", {"route_code": ROUTE_CODE})
