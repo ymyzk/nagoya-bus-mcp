@@ -101,9 +101,9 @@ class ApproachBusPositionInfo(BaseModel):
     """
 
     car_code: str
-    previous_stop_name: str
+    previous_stop: RouteBusStopInfo
     passed_time: Annotated[str, Field(description="通過時刻(HH:MM:SS形式)")]
-    next_stop_name: str
+    next_stop: RouteBusStopInfo
 
 
 class RouteApproachResponse(BaseModel):
@@ -419,9 +419,9 @@ async def get_approach(ctx: Context, route_code: str) -> RouteApproachResponse |
         bus_positions.append(
             ApproachBusPositionInfo(
                 car_code=current_bus_position["car_code"],
-                previous_stop_name=previous_stop.station_name,
+                previous_stop=previous_stop,
                 passed_time=current_bus_position["passed_time"],
-                next_stop_name=next_stop.station_name,
+                next_stop=next_stop,
             )
         )
 

@@ -156,6 +156,35 @@ async def test_get_approach_succeeds_and_has_expected_structure() -> None:
         assert isinstance(data["bus_stops"], list)
         assert isinstance(data["bus_positions"], list)
 
+        # Validate bus_stops structure
+        for bus_stop in data["bus_stops"]:
+            assert "station_number" in bus_stop
+            assert "station_name" in bus_stop
+            assert "pole_name" in bus_stop
+            assert isinstance(bus_stop["station_number"], int)
+            assert isinstance(bus_stop["station_name"], str)
+            assert isinstance(bus_stop["pole_name"], str)
+
+        # Validate bus_positions structure
+        for bus_position in data["bus_positions"]:
+            assert "car_code" in bus_position
+            assert "previous_stop" in bus_position
+            assert "passed_time" in bus_position
+            assert "next_stop" in bus_position
+            assert isinstance(bus_position["car_code"], str)
+            assert isinstance(bus_position["passed_time"], str)
+            assert re.match(r"^\d{2}:\d{2}:\d{2}$", bus_position["passed_time"])
+            # Validate nested RouteBusStopInfo objects
+            assert isinstance(bus_position["previous_stop"], dict)
+            assert isinstance(bus_position["next_stop"], dict)
+            for stop in [bus_position["previous_stop"], bus_position["next_stop"]]:
+                assert "station_number" in stop
+                assert "station_name" in stop
+                assert "pole_name" in stop
+                assert isinstance(stop["station_number"], int)
+                assert isinstance(stop["station_name"], str)
+                assert isinstance(stop["pole_name"], str)
+
 
 @pytest.mark.asyncio
 @pytest.mark.integration
