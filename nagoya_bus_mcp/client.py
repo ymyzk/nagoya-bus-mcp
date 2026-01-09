@@ -38,6 +38,20 @@ class DiagramRoute(BaseModel):
 DiagramResponse = RootModel[dict[str, list[DiagramRoute]]]
 
 
+class BusStopPoleInfo(BaseModel):
+    """Pole information within a bus stop."""
+
+    model_config = _UPPER_ALIAS_CONFIG
+
+    bc: str  # e.g., "5E1"
+    c: str  # e.g., "5E1"
+    n: str  # e.g., "1番"
+
+
+# e.g., {"01110301": ...}
+BusStopPoleInfoResponse = RootModel[dict[str, BusStopPoleInfo]]
+
+
 class BusStopPole(BaseModel):
     """Pole information model."""
 
@@ -156,6 +170,13 @@ class Client:
         response = await self.client.get(url)
         response.raise_for_status()
         return StationNamesResponse.model_validate(response.json())
+
+    async def get_bus_stop_pole_info(self) -> BusStopPoleInfoResponse:
+        """Get bus stop pole information."""
+        url = "/BUS_SEKKIN/master_json/buspole_infos.json"
+        response = await self.client.get(url)
+        response.raise_for_status()
+        return BusStopPoleInfoResponse.model_validate(response.json())
 
     async def get_station_diagram(self, station_number: int) -> DiagramResponse:
         """Get timetable diagram for a specific station.

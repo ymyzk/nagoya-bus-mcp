@@ -109,6 +109,50 @@ async def test_get_station_names_on_server_error(client_factory: ClientFactory) 
 
 
 @pytest.mark.asyncio
+async def test_get_bus_stop_pole_info_success(
+    client_factory: ClientFactory,
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test successful retrieval of bus stop pole information."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/buspole_infos.json",
+            response=httpx.Response(
+                status_code=200,
+                json=fixture_loader("buspole_infos.json"),
+            ),
+        )
+    )
+
+    result = await client.get_bus_stop_pole_info()
+
+    assert result.root["01110301"].c == "301"
+    assert result.root["01110301"].bc == "301"
+    assert result.root["01110301"].n == "1番"
+    assert result.root["75030701"].c == "701"
+    assert result.root["75030701"].n == "2番"
+    assert result.root["711455W1"].c == "5W1"
+    assert result.root["711455W1"].n == "5番"
+    assert len(result.root) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_bus_stop_pole_info_on_server_error(
+    client_factory: ClientFactory,
+) -> None:
+    """Test HTTP error handling for get_bus_stop_pole_info."""
+    client = client_factory(
+        create_mock_transport(
+            path="/BUS_SEKKIN/master_json/buspole_infos.json",
+            response=httpx.Response(status_code=500),
+        )
+    )
+
+    with pytest.raises(httpx.HTTPStatusError):
+        await client.get_bus_stop_pole_info()
+
+
+@pytest.mark.asyncio
 async def test_get_station_diagram_success(
     client_factory: ClientFactory,
     fixture_loader: FixtureLoader,
