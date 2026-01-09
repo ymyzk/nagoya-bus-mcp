@@ -91,6 +91,7 @@ class RouteBusStopInfo(BaseModel):
 
     station_number: int
     station_name: str
+    pole_name: str
 
 
 class ApproachBusPositionInfo(BaseModel):
@@ -116,6 +117,7 @@ class RouteApproachResponse(BaseModel):
     bus_positions: list[ApproachBusPositionInfo]
 
 
+_cached_pole_names: dict[str, str] | None = None
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 _cached_route_masters: dict[str, KeitoResponse] | None = None
@@ -144,6 +146,14 @@ def _get_client_from_context(ctx: Context) -> Client:
         raise RuntimeError(msg)
     lifespan_context = cast("LifespanContext", ctx.request_context.lifespan_context)
     return lifespan_context.bus_client
+
+
+async def _get_pole_names(client: Client) -> dict[str, str]:
+    global _cached_pole_names  # noqa: PLW0603
+    if _cached_pole_names is None:
+        poles = (await client.get_bus_stop_pole_info()).root
+        _cached_pole_names = {code: pole.n for code, pole in poles.items()}
+    return _cached_pole_names
 
 
 async def _get_station_names(client: Client) -> dict[str, int]:
@@ -355,12 +365,12 @@ async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> RouteBusStopI
         msg = f"bus_stop_code must be at least 5 digits, got: {bus_stop_code!r}"
         raise ValueError(msg)
     station_number = int(bus_stop_code[:5].lstrip("0"))
-    # TODO: Add pole support
-    # pole = bus_stop_code[5:]  # noqa: ERA001
     station_name = (await _get_station_numbers(client)).get(station_number)
+    pole_name = (await _get_pole_names(client)).get(bus_stop_code)
     return RouteBusStopInfo(
         station_number=station_number,
         station_name=station_name or "不明なバス停",
+        pole_name=pole_name or "不明なのりば",
     )
 
 
