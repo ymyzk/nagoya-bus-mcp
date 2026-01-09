@@ -70,23 +70,6 @@ class PoleInfoResponse(BaseModel):
     noriba: Annotated[str, Field(description="乗り場名")]
 
 
-class RouteInfoResponse(BaseModel):
-    """Master information for a specific bus route.
-
-    Contains metadata about the route including origin, destination,
-    route number, and the complete list of stops along the route.
-    """
-
-    to: Annotated[str, Field(description="行き先")]
-    from_: Annotated[str, Field(description="出発地")]
-    direction: Annotated[str, Field(description="方向")]
-    no: Annotated[str, Field(description="路線番号")]
-    article: Annotated[str, Field(description="記事")]
-    keito: Annotated[str, Field(description="系統コード")]
-    rosen: Annotated[str, Field(description="路線名")]
-    busstops: Annotated[list[str], Field(description="バス停のリスト")]
-
-
 class BusstopInfoResponse(BaseModel):
     """Complete information about a bus stop.
 
@@ -372,31 +355,6 @@ async def get_busstop_info(
         return None
 
     return BusstopInfoResponse.model_validate(busstop_data)
-
-
-async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse | None:
-    """Get master information for a specific bus route.
-
-    Retrieves route metadata including origin, destination, route number,
-    and the complete list of stops along the route. Results are cached.
-
-    Args:
-        ctx: FastMCP context containing the bus client.
-        route_code: The route code (keito) to query (e.g., "1123002").
-
-    Returns:
-        RouteInfoResponse with route details and stop list, or None if not found.
-    """
-    client = _get_client_from_context(ctx)
-
-    log.info("Getting route master information for route code %s", route_code)
-
-    route_master = await _get_route_master(client, route_code)
-    if not route_master:
-        log.error("No route master information found for route code %s", route_code)
-        return None
-
-    return RouteInfoResponse.model_validate(route_master.model_dump())
 
 
 async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> RouteBusStopInfo:
