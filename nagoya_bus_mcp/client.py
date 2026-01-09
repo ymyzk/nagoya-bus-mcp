@@ -111,9 +111,9 @@ class Client:
                 If None, the cache will be disabled.
 
         Note:
-            All requests are automatically cached using hishel's
-            AsyncCacheTransport with SQLite storage, regardless of the
-            provided transport.
+            When ``cache_database_path`` is provided, all requests are
+            automatically cached using hishel's AsyncCacheTransport with
+            SQLite storage, wrapping the provided transport.
         """
         if transport is None:
             transport = httpx.AsyncHTTPTransport()
