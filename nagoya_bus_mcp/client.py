@@ -196,7 +196,7 @@ class Client:
         self._check_404(response)
         return DiagramResponse.model_validate(response.json())
 
-    async def get_bus_stops(self, station_number: int) -> BusStopResponse:
+    async def get_bus_stop(self, station_number: int) -> BusStopResponse:
         """Get bus stop information for a specific station.
 
         Args:
@@ -295,7 +295,6 @@ if __name__ == "__main__":
             print(await client.get_station_names())
             # 白川通大津
             print(await client.get_station_diagram(22460))
-            print(await client.get_bus_stops(22460))
             print(await client.get_keitos("1123002"))
             print(await client.get_realtime_approach("1123002"))
 

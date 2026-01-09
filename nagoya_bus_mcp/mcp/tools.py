@@ -121,7 +121,6 @@ _cached_pole_names: dict[str, str] | None = None
 _cached_station_names: dict[str, int] | None = None
 _cached_station_numbers: dict[int, str] | None = None
 _cached_route_masters: dict[str, KeitoResponse] | None = None
-_cached_busstops: dict[int, dict[str, dict[str, str]] | None] | None = None
 
 
 def _get_client_from_context(ctx: Context) -> Client:
@@ -204,22 +203,6 @@ async def _get_realtime_approach(
         approach_response[k] = stop_pass_info
 
     return approach_response
-
-
-async def _get_busstops(
-    client: Client, station_number: int
-) -> dict[str, dict[str, str]] | None:
-    """Get bus stop information from the API."""
-    global _cached_busstops  # noqa: PLW0603
-    if _cached_busstops is None:
-        _cached_busstops = {}
-    if station_number not in _cached_busstops:
-        busstop_response = await client.get_bus_stops(station_number)
-        if busstop_response is None:
-            _cached_busstops[station_number] = None
-            return None
-        _cached_busstops[station_number] = busstop_response.model_dump()
-    return _cached_busstops[station_number]
 
 
 async def get_station_number(
@@ -351,12 +334,21 @@ async def get_busstop_info(
     client = _get_client_from_context(ctx)
 
     log.info("Getting bus stop information for station number %s", station_number)
-    busstop_data = await _get_busstops(client, station_number)
-    if not busstop_data:
-        log.error("No bus stop information found for station number %s", station_number)
-        return None
+    busstop = await client.get_bus_stop(station_number)
 
-    return BusstopInfoResponse.model_validate(busstop_data)
+    return BusstopInfoResponse(
+        name=busstop.name,
+        kana=busstop.kana,
+        poles=[
+            PoleInfoResponse(
+                keitos=pole.keitos,
+                code=pole.code,
+                bcode=pole.bcode,
+                noriba=pole.noriba,
+            )
+            for pole in busstop.poles
+        ],
+    )
 
 
 async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> RouteBusStopInfo:

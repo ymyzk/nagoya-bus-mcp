@@ -233,7 +233,7 @@ async def test_get_station_diagram_on_server_error(
 
 
 @pytest.mark.asyncio
-async def test_get_bus_stops_success(
+async def test_get_bus_stop_success(
     client_factory: ClientFactory,
     fixture_loader: FixtureLoader,
 ) -> None:
@@ -248,7 +248,7 @@ async def test_get_bus_stops_success(
         )
     )
 
-    result = await client.get_bus_stops(NAGOYA_STATION_ID)
+    result = await client.get_bus_stop(NAGOYA_STATION_ID)
 
     assert result is not None
     assert result.name == "名古屋駅"
@@ -258,8 +258,8 @@ async def test_get_bus_stops_success(
 
 
 @pytest.mark.asyncio
-async def test_get_bus_stops_on_not_found(client_factory: ClientFactory) -> None:
-    """Test HTTP error handling for get_bus_stops."""
+async def test_get_bus_stop_on_not_found(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_bus_stop."""
     client = client_factory(
         create_mock_transport(
             path="/",
@@ -268,12 +268,12 @@ async def test_get_bus_stops_on_not_found(client_factory: ClientFactory) -> None
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_bus_stops(INVALID_STATION_ID)
+        await client.get_bus_stop(INVALID_STATION_ID)
 
 
 @pytest.mark.asyncio
-async def test_get_bus_stops_on_server_error(client_factory: ClientFactory) -> None:
-    """Test HTTP error handling for get_bus_stops."""
+async def test_get_bus_stop_on_server_error(client_factory: ClientFactory) -> None:
+    """Test HTTP error handling for get_bus_stop."""
     client = client_factory(
         create_mock_transport(
             path="/BUS_SEKKIN/master_json/busstops/41200.json",
@@ -282,7 +282,7 @@ async def test_get_bus_stops_on_server_error(client_factory: ClientFactory) -> N
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_bus_stops(NAGOYA_STATION_ID)
+        await client.get_bus_stop(NAGOYA_STATION_ID)
 
 
 @pytest.mark.asyncio
