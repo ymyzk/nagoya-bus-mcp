@@ -82,18 +82,6 @@ class BusstopInfoResponse(BaseModel):
     kana: Annotated[str, Field(description="バス停名(カナ)")]
 
 
-class StopApproachInfo(BaseModel):
-    """Real-time information about a bus passing or approaching a stop.
-
-    Contains the stop identifier, timestamp of the bus passing, and the
-    unique vehicle code for tracking.
-    """
-
-    stop_id: Annotated[str, Field(description="停留所ID")]
-    passed_time: Annotated[str, Field(description="通過時刻(HH:MM形式)")]
-    car_code: Annotated[str, Field(description="車両コード")]
-
-
 class RouteBusStopInfo(BaseModel):
     """Information about a bus stop on a specific route.
 
