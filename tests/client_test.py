@@ -445,7 +445,7 @@ async def test_cache_disabled_when_path_is_none(
         assert request_count == 2
 
         # Verify the transport is not wrapped in AsyncCacheTransport
-        assert not isinstance(client.client._transport, AsyncCacheTransport)
+        assert not isinstance(client.client._transport, AsyncCacheTransport)  # noqa: SLF001
     finally:
         await client.close()
 
@@ -512,10 +512,10 @@ async def test_cache_transport_wraps_provided_transport() -> None:
 
     try:
         # Verify the transport is wrapped in AsyncCacheTransport
-        assert isinstance(client.client._transport, AsyncCacheTransport)
+        assert isinstance(client.client._transport, AsyncCacheTransport)  # noqa: SLF001
 
         # Verify the next_transport in the cache is our custom transport
-        cache_transport = client.client._transport
+        cache_transport = client.client._transport  # noqa: SLF001
         assert cache_transport.next_transport is custom_transport
     finally:
         await client.close()
