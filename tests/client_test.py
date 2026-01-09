@@ -475,22 +475,24 @@ async def test_cache_enabled_when_path_is_provided(
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
         cache_db_path = tmp_file.name
 
-    # Create client with cache_database_path (caching enabled)
-    client = Client(transport=mock_transport, cache_database_path=cache_db_path)
-
     try:
-        # Make the same request twice
-        result1 = await client.get_station_names()
-        result2 = await client.get_station_names()
+        # Create client with cache_database_path (caching enabled)
+        client = Client(transport=mock_transport, cache_database_path=cache_db_path)
 
-        # Only the first request should hit the transport (second is cached)
-        assert request_count == 1
+        try:
+            # Make the same request twice
+            result1 = await client.get_station_names()
+            result2 = await client.get_station_names()
 
-        # Both results should be identical
-        assert result1.root == result2.root
-        assert result1.root["名古屋駅"] == NAGOYA_STATION_ID
+            # Only the first request should hit the transport (second is cached)
+            assert request_count == 1
+
+            # Both results should be identical
+            assert result1.root == result2.root
+            assert result1.root["名古屋駅"] == NAGOYA_STATION_ID
+        finally:
+            await client.close()
     finally:
-        await client.close()
         # Clean up the temporary cache database
         Path(cache_db_path).unlink(missing_ok=True)
 
@@ -507,17 +509,19 @@ async def test_cache_transport_wraps_provided_transport() -> None:
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
         cache_db_path = tmp_file.name
 
-    # Create client with both custom transport and cache enabled
-    client = Client(transport=custom_transport, cache_database_path=cache_db_path)
-
     try:
-        # Verify the transport is wrapped in AsyncCacheTransport
-        assert isinstance(client.client._transport, AsyncCacheTransport)  # noqa: SLF001
+        # Create client with both custom transport and cache enabled
+        client = Client(transport=custom_transport, cache_database_path=cache_db_path)
 
-        # Verify the next_transport in the cache is our custom transport
-        cache_transport = client.client._transport  # noqa: SLF001
-        assert cache_transport.next_transport is custom_transport
+        try:
+            # Verify the transport is wrapped in AsyncCacheTransport
+            assert isinstance(client.client._transport, AsyncCacheTransport)  # noqa: SLF001
+
+            # Verify the next_transport in the cache is our custom transport
+            cache_transport = client.client._transport  # noqa: SLF001
+            assert cache_transport.next_transport is custom_transport
+        finally:
+            await client.close()
     finally:
-        await client.close()
         # Clean up the temporary cache database
         Path(cache_db_path).unlink(missing_ok=True)
