@@ -4,8 +4,10 @@ from collections.abc import AsyncGenerator, Callable
 import json
 from pathlib import Path
 import re
+import tempfile
 from typing import Any
 
+from hishel.httpx import AsyncCacheTransport
 import httpx
 import pytest
 import pytest_asyncio
@@ -409,3 +411,113 @@ async def test_client_cannot_use_after_close(client_factory: ClientFactory) -> N
         # Ensure cleanup in case test fails
         if not client.client.is_closed:
             await client.close()
+
+
+@pytest.mark.asyncio
+async def test_cache_disabled_when_path_is_none(
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test that caching is disabled when cache_database_path is None."""
+    # Create a custom transport to track request counts
+    request_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        if request.url.path == "/STATION_DATA/station_infos/station_name.json":
+            return httpx.Response(
+                status_code=200,
+                json=fixture_loader("station_name.json"),
+            )
+        return httpx.Response(status_code=404)
+
+    mock_transport = httpx.MockTransport(handler)
+
+    # Create client with no cache_database_path (caching disabled)
+    client = Client(transport=mock_transport, cache_database_path=None)
+
+    try:
+        # Make the same request twice
+        await client.get_station_names()
+        await client.get_station_names()
+
+        # Both requests should hit the transport (no caching)
+        assert request_count == 2
+
+        # Verify the transport is not wrapped in AsyncCacheTransport
+        assert not isinstance(client.client._transport, AsyncCacheTransport)
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
+async def test_cache_enabled_when_path_is_provided(
+    fixture_loader: FixtureLoader,
+) -> None:
+    """Test that caching works correctly when cache_database_path is provided."""
+    # Create a custom transport to track request counts
+    request_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        if request.url.path == "/STATION_DATA/station_infos/station_name.json":
+            return httpx.Response(
+                status_code=200,
+                json=fixture_loader("station_name.json"),
+                headers={"Cache-Control": "max-age=3600"},
+            )
+        return httpx.Response(status_code=404)
+
+    mock_transport = httpx.MockTransport(handler)
+
+    # Create a temporary database file for the cache
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
+        cache_db_path = tmp_file.name
+
+    # Create client with cache_database_path (caching enabled)
+    client = Client(transport=mock_transport, cache_database_path=cache_db_path)
+
+    try:
+        # Make the same request twice
+        result1 = await client.get_station_names()
+        result2 = await client.get_station_names()
+
+        # Only the first request should hit the transport (second is cached)
+        assert request_count == 1
+
+        # Both results should be identical
+        assert result1.root == result2.root
+        assert result1.root["名古屋駅"] == NAGOYA_STATION_ID
+    finally:
+        await client.close()
+        # Clean up the temporary cache database
+        Path(cache_db_path).unlink(missing_ok=True)
+
+
+@pytest.mark.asyncio
+async def test_cache_transport_wraps_provided_transport() -> None:
+    """Test that the cache transport wraps the provided transport correctly."""
+    # Create a custom transport
+    custom_transport = httpx.MockTransport(
+        lambda _: httpx.Response(status_code=200, json={})
+    )
+
+    # Create a temporary database file for the cache
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
+        cache_db_path = tmp_file.name
+
+    # Create client with both custom transport and cache enabled
+    client = Client(transport=custom_transport, cache_database_path=cache_db_path)
+
+    try:
+        # Verify the transport is wrapped in AsyncCacheTransport
+        assert isinstance(client.client._transport, AsyncCacheTransport)
+
+        # Verify the next_transport in the cache is our custom transport
+        cache_transport = client.client._transport
+        assert cache_transport.next_transport is custom_transport
+    finally:
+        await client.close()
+        # Clean up the temporary cache database
+        Path(cache_db_path).unlink(missing_ok=True)
