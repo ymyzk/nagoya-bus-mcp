@@ -7,6 +7,7 @@ from operator import iadd
 from typing import TYPE_CHECKING, Annotated, cast
 
 from fastmcp import Context
+from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, Field
 
 from nagoya_bus_mcp.client import Client
@@ -300,16 +301,11 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
 
     station_name = (await _get_station_numbers(client)).get(station_number)
     if station_name is None:
-        log.warning("Station number %s not found", station_number)
-        return None
+        msg = f"Station number {station_number} not found"
+        raise ToolError(msg)
 
     log.info("Getting timetable for station number %s", station_number)
     diagram_response = await client.get_station_diagram(station_number)
-    if not diagram_response.root:
-        log.error(
-            "Failed to get station diagram for %s (%s)", station_name, station_number
-        )
-        return None
 
     timetables: list[TimeTable] = []
     for line, railways in diagram_response.root.items():
@@ -382,9 +378,6 @@ async def get_route_master(ctx: Context, route_code: str) -> RouteInfoResponse |
     log.info("Getting route master information for route code %s", route_code)
 
     route_master = await _get_route_master(client, route_code)
-    if not route_master:
-        log.error("No route master information found for route code %s", route_code)
-        return None
 
     return RouteInfoResponse.model_validate(route_master)
 
@@ -408,8 +401,5 @@ async def get_approach(ctx: Context, route_code: str) -> ApproachResponse | None
     log.info("Getting real-time approach information for route code %s", route_code)
 
     approach_info = await _get_realtime_approach(client, route_code)
-    if not approach_info:
-        log.error("No approach information found for route code %s", route_code)
-        return None
 
     return ApproachResponse.model_validate(approach_info)
