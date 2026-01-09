@@ -38,6 +38,7 @@ class TimeTable(BaseModel):
     """
 
     route: Annotated[str, Field(description="路線")]
+    route_codes: Annotated[list[int], Field(description="路線コードのリスト")]
     direction: Annotated[str, Field(description="方面")]
     pole: Annotated[str, Field(description="乗り場")]
     stop_stations: Annotated[list[str], Field(description="停車バス停のリスト")]
@@ -305,6 +306,9 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
                 TimeTable(
                     route=line,
                     direction="・".join(railway.railway),
+                    route_codes=(
+                        railway.railway_ids  # pyrefly: ignore[bad-argument-type]
+                    ),
                     stop_stations=reduce(iadd, railway.stations, []),
                     pole=railway.polename,
                     timetable=diagram,
