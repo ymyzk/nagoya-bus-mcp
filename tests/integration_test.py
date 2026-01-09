@@ -11,10 +11,13 @@ from fastmcp import Client
 from fastmcp.exceptions import ToolError
 import pytest
 
-from nagoya_bus_mcp.mcp.server import mcp_server
+from nagoya_bus_mcp.mcp.server import Settings, build_mcp_server
 
 NAGOYA_STATION_NUMBER = 41200
 ROUTE_CODE = "1123002"
+
+
+mcp_server = build_mcp_server(Settings())
 
 
 @pytest.mark.asyncio

@@ -26,6 +26,13 @@ except ImportError:
 
 
 @dataclass
+class Settings:
+    """Settings for the MCP server."""
+
+    cache_database_path: str | None = None
+
+
+@dataclass
 class LifespanContext:
     """Lifespan context holding shared resources for the MCP server.
 
@@ -36,31 +43,41 @@ class LifespanContext:
     bus_client: Client
 
 
-@asynccontextmanager
-async def lifespan(_mcp: FastMCP) -> AsyncIterator[LifespanContext]:
-    """Manage the lifespan of the MCP server.
-
-    Creates and maintains a single HTTP client for the Nagoya Bus API
-    that is shared across all tool invocations during the server's lifetime.
+def build_mcp_server(settings: Settings) -> FastMCP:
+    """Build and return the MCP server instance.
 
     Args:
-        _mcp: The FastMCP server instance (unused).
-
-    Yields:
-        LifespanContext containing the shared bus client.
+        settings: Settings for the MCP server.
     """
-    log.info("Starting lifespan and initializing context")
-    async with Client() as bus_client:
-        context = LifespanContext(bus_client=bus_client)
-        log.info("Lifespan context initialized")
-        yield context
-    log.info("Lifespan context closed")
 
+    @asynccontextmanager
+    async def lifespan(_mcp: FastMCP) -> AsyncIterator[LifespanContext]:
+        """Manage the lifespan of the MCP server.
 
-mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version=version, lifespan=lifespan)
-mcp_server.tool(get_station_number)
-mcp_server.tool(get_timetable)
-mcp_server.tool(get_busstop_info)
-mcp_server.tool(get_approach)
-mcp_server.prompt(ask_timetable)
-mcp_server.prompt(ask_bus_approach)
+        Creates and maintains a single HTTP client for the Nagoya Bus API
+        that is shared across all tool invocations during the server's lifetime.
+
+        Args:
+            _mcp: The FastMCP server instance (unused).
+
+        Yields:
+            LifespanContext containing the shared bus client.
+        """
+        log.info("Starting lifespan and initializing context")
+        async with Client(
+            cache_database_path=settings.cache_database_path
+        ) as bus_client:
+            context = LifespanContext(bus_client=bus_client)
+            log.info("Lifespan context initialized")
+            yield context
+        log.info("Lifespan context closed")
+
+    mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version=version, lifespan=lifespan)
+    mcp_server.tool(get_station_number)
+    mcp_server.tool(get_timetable)
+    mcp_server.tool(get_busstop_info)
+    mcp_server.tool(get_approach)
+    mcp_server.prompt(ask_timetable)
+    mcp_server.prompt(ask_bus_approach)
+
+    return mcp_server
