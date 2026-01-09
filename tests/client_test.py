@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncGenerator, Callable
 import json
+import os
 from pathlib import Path
 import re
 import tempfile
@@ -472,8 +473,8 @@ async def test_cache_enabled_when_path_is_provided(
     mock_transport = httpx.MockTransport(handler)
 
     # Create a temporary database file for the cache
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
-        cache_db_path = tmp_file.name
+    fd, cache_db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)  # Close the file descriptor as we only need the path
 
     try:
         # Create client with cache_database_path (caching enabled)
@@ -506,8 +507,8 @@ async def test_cache_transport_wraps_provided_transport() -> None:
     )
 
     # Create a temporary database file for the cache
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp_file:
-        cache_db_path = tmp_file.name
+    fd, cache_db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)  # Close the file descriptor as we only need the path
 
     try:
         # Create client with both custom transport and cache enabled
