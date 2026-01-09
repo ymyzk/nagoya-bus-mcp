@@ -26,6 +26,7 @@ class DiagramRoute(BaseModel):
     model_config = _UPPER_ALIAS_CONFIG
     polename: str  # e.g., "1番"
     railway: list[str]  # e.g., ["名古屋大学(吹上経由)"]
+    railway_ids: list[int]  # e.g., [2711002]
     stations: list[list[str]]  # e.g., [["矢場町", "名古屋大学"]]
     diagram: Diagram
 

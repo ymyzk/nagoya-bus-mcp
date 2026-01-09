@@ -82,6 +82,7 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
         tt = data["timetables"][0]
         assert {
             "route",
+            "route_codes",
             "direction",
             "pole",
             "stop_stations",
@@ -90,6 +91,9 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
         }.issubset(tt.keys())
         assert isinstance(tt["route"], str)
         assert len(tt["route"]) > 0
+        assert isinstance(tt["route_codes"], list)
+        assert len(tt["route_codes"]) > 0
+        assert all(isinstance(rc, int) and rc for rc in tt["route_codes"])
         assert isinstance(tt["direction"], str)
         assert isinstance(tt["pole"], str)
         assert isinstance(tt["stop_stations"], list)
