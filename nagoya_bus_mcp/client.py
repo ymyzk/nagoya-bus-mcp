@@ -94,6 +94,8 @@ class ApproachInfoResponse(BaseModel):
     model_config = _UPPER_ALIAS_CONFIG
 
     # e.g., {"71145/1E1": {"NS 0341": "14:24:32"}}
+    # NS 0341 passed the previous stop at 14:24:32
+    # and it's headed to stop with station 71145 and pole 1E1.
     latest_bus_pass: dict[str, dict[str, str]]
     current_bus_positions: dict[str, dict[str, str]]
 
