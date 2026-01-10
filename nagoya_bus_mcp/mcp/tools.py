@@ -58,31 +58,6 @@ class TimeTableResponse(BaseModel):
     url: str
 
 
-class PoleInfoResponse(BaseModel):
-    """Information about a specific pole (boarding location) at a bus stop.
-
-    Each pole serves one or more routes and has associated codes for
-    identification and real-time tracking.
-    """
-
-    keitos: Annotated[list[str], Field(description="路線コードのリスト")]
-    code: Annotated[str, Field(description="ポールコード")]
-    bcode: Annotated[str, Field(description="バスコード")]
-    noriba: Annotated[str, Field(description="乗り場名")]
-
-
-class BusstopInfoResponse(BaseModel):
-    """Complete information about a bus stop.
-
-    Contains the stop name, phonetic reading, and details about all
-    boarding locations (poles) at the stop.
-    """
-
-    poles: Annotated[list[PoleInfoResponse], Field(description="乗り場のリスト")]
-    name: Annotated[str, Field(description="バス停名")]
-    kana: Annotated[str, Field(description="バス停名(カナ)")]
-
-
 class ApproachBusStop(BaseModel):
     """Information about a bus stop on a specific route.
 
@@ -302,41 +277,6 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
         timetables=timetables,
         station_number=station_number,
         url=f"{client.base_url}/jp/pc/bus/timetable_list.html?name={station_name}&toname=",
-    )
-
-
-async def get_busstop_info(
-    ctx: Context, station_number: int
-) -> BusstopInfoResponse | None:
-    """Get detailed bus stop information including all poles and routes.
-
-    Retrieves pole information, route codes, and boarding location details
-    for a specific bus stop. Results are cached for performance.
-
-    Args:
-        ctx: FastMCP context containing the bus client.
-        station_number: The station number to query (e.g., 22460).
-
-    Returns:
-        BusstopInfoResponse with stop name and pole details, or None if not found.
-    """
-    client = _get_client_from_context(ctx)
-
-    log.info("Getting bus stop information for station number %s", station_number)
-    busstop = await client.get_bus_stop(station_number)
-
-    return BusstopInfoResponse(
-        name=busstop.name,
-        kana=busstop.kana,
-        poles=[
-            PoleInfoResponse(
-                keitos=pole.keitos,
-                code=pole.code,
-                bcode=pole.bcode,
-                noriba=pole.noriba,
-            )
-            for pole in busstop.poles
-        ],
     )
 
 
