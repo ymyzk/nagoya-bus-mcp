@@ -216,7 +216,7 @@ class Client:
         self._check_404(response)
         return BusStopResponse.model_validate(response.json())
 
-    async def get_keitos(self, keito_code: str) -> KeitoResponse:
+    async def get_keito(self, keito_code: str) -> KeitoResponse:
         """Get route master information for a specific route.
 
         Args:
@@ -297,7 +297,7 @@ if __name__ == "__main__":
             print(await client.get_station_names())
             # 白川通大津
             print(await client.get_station_diagram(22460))
-            print(await client.get_keitos("1123002"))
+            print(await client.get_keito("1123002"))
             print(await client.get_realtime_approach("1123002"))
 
     asyncio.run(main())

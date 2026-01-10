@@ -301,7 +301,7 @@ async def test_get_routes_success(
         )
     )
 
-    result = await client.get_keitos(ROUTE_CODE)
+    result = await client.get_keito(ROUTE_CODE)
 
     assert result is not None
     assert result.to == "栄"
@@ -321,7 +321,7 @@ async def test_get_routes_on_not_found(client_factory: ClientFactory) -> None:
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_keitos(INVALID_ROUTE_CODE)
+        await client.get_keito(INVALID_ROUTE_CODE)
 
 
 @pytest.mark.asyncio
@@ -335,7 +335,7 @@ async def test_get_routes_on_server_error(client_factory: ClientFactory) -> None
     )
 
     with pytest.raises(httpx.HTTPStatusError):
-        await client.get_keitos(ROUTE_CODE)
+        await client.get_keito(ROUTE_CODE)
 
 
 @pytest.mark.asyncio
