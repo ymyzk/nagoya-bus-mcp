@@ -363,7 +363,7 @@ async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInf
     data for a given route code.
     """
     # e.g., ["62185701", "71060701", "31165701", ...]
-    bus_stop_codes: list[str] = (await client.get_keitos(route_code)).busstops
+    bus_stop_codes: list[str] = (await client.get_keito(route_code)).busstops
     approach = await client.get_realtime_approach(route_code)
 
     bus_stops: list[ApproachBusStop] = await asyncio.gather(
