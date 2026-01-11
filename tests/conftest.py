@@ -11,7 +11,7 @@ from tests.types import FixtureLoader
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def fixture_loader() -> FixtureLoader:
     def _fixture_loader(name: str) -> Any:  # noqa: ANN401
         fixture_path = FIXTURE_DIR / name
