@@ -1,18 +1,14 @@
 """Unit tests for the HTTP client."""
 
 from collections.abc import AsyncGenerator, Callable
-import json
-from pathlib import Path
 import re
-from typing import Any
 
 import httpx
 import pytest
 import pytest_asyncio
 
 from nagoya_bus_mcp.client import Client
-
-FIXTURE_DIR = Path(__file__).parent / "fixtures"
+from tests.types import FixtureLoader
 
 # Test constants
 NAGOYA_STATION_ID = 41200
@@ -40,19 +36,6 @@ def create_mock_transport(
         )
 
     return httpx.MockTransport(handler)
-
-
-FixtureLoader = Callable[[str], Any]
-
-
-@pytest.fixture
-def fixture_loader() -> FixtureLoader:
-    def _fixture_loader(name: str) -> Any:  # noqa: ANN401
-        fixture_path = FIXTURE_DIR / name
-        with fixture_path.open("rb") as f:
-            return json.load(f)
-
-    return _fixture_loader
 
 
 ClientFactory = Callable[[httpx.MockTransport], Client]
