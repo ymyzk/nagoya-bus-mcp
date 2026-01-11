@@ -8,6 +8,7 @@ from logging import getLogger
 from fastmcp import FastMCP
 
 from nagoya_bus_mcp.client import Client
+from nagoya_bus_mcp.data import BaseData, init_base_data
 from nagoya_bus_mcp.mcp.prompts import ask_bus_approach, ask_timetable
 from nagoya_bus_mcp.mcp.tools import (
     get_approach,
@@ -37,10 +38,11 @@ class LifespanContext:
     """Lifespan context holding shared resources for the MCP server.
 
     This context is created at server startup and provides access to the
-    shared HTTP client for Nagoya Bus API requests.
+    shared HTTP client for Nagoya Bus API requests and preloaded base data.
     """
 
     bus_client: Client
+    base_data: BaseData
 
 
 def build_mcp_server(settings: Settings) -> FastMCP:
@@ -56,18 +58,21 @@ def build_mcp_server(settings: Settings) -> FastMCP:
 
         Creates and maintains a single HTTP client for the Nagoya Bus API
         that is shared across all tool invocations during the server's lifetime.
+        Also initializes base data (stations and poles) at startup.
 
         Args:
             _mcp: The FastMCP server instance (unused).
 
         Yields:
-            LifespanContext containing the shared bus client.
+            LifespanContext containing the shared bus client and base data.
         """
         log.info("Starting lifespan and initializing context")
         async with Client(
             cache_database_path=settings.cache_database_path
         ) as bus_client:
-            context = LifespanContext(bus_client=bus_client)
+            log.info("Initializing base data")
+            base_data = await init_base_data(bus_client)
+            context = LifespanContext(bus_client=bus_client, base_data=base_data)
             log.info("Lifespan context initialized")
             yield context
         log.info("Lifespan context closed")
