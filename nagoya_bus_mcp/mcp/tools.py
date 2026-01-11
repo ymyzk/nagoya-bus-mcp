@@ -1,7 +1,6 @@
 """MCP tool implementations for Nagoya Bus information queries."""
 
 import asyncio
-import difflib
 from functools import reduce
 from logging import getLogger
 from operator import iadd, itemgetter
@@ -11,6 +10,7 @@ from fastmcp import Context
 from pydantic import BaseModel, Field
 
 from nagoya_bus_mcp.client import Client
+from nagoya_bus_mcp.data import BaseData
 
 if TYPE_CHECKING:
     from nagoya_bus_mcp.mcp.server import LifespanContext
@@ -198,19 +198,14 @@ class ApproachForStationResponse(BaseModel):
     url: str
 
 
-_cached_pole_names: dict[str, str] | None = None
-_cached_station_names: dict[str, int] | None = None
-_cached_station_numbers: dict[int, str] | None = None
-
-
-def _get_client_from_context(ctx: Context) -> Client:
-    """Extract the bus client from the context.
+def _get_context_from_context(ctx: Context) -> tuple[Client, BaseData]:
+    """Extract the bus client and base data from the context.
 
     Args:
         ctx: The FastMCP context object.
 
     Returns:
-        The bus client instance.
+        A tuple of (Client, BaseData).
 
     Raises:
         RuntimeError: If request_context is None.
@@ -224,31 +219,7 @@ def _get_client_from_context(ctx: Context) -> Client:
         )
         raise RuntimeError(msg)
     lifespan_context = cast("LifespanContext", ctx.request_context.lifespan_context)
-    return lifespan_context.bus_client
-
-
-async def _get_pole_names(client: Client) -> dict[str, str]:
-    global _cached_pole_names  # noqa: PLW0603
-    if _cached_pole_names is None:
-        poles = (await client.get_bus_stop_pole_info()).root
-        _cached_pole_names = {code: pole.n for code, pole in poles.items()}
-    return _cached_pole_names
-
-
-async def _get_station_names(client: Client) -> dict[str, int]:
-    global _cached_station_names  # noqa: PLW0603
-    if _cached_station_names is None:
-        _cached_station_names = (await client.get_station_names()).root
-    return _cached_station_names
-
-
-async def _get_station_numbers(client: Client) -> dict[int, str]:
-    global _cached_station_numbers  # noqa: PLW0603
-    if _cached_station_numbers is None:
-        _cached_station_numbers = {
-            num: name for name, num in (await _get_station_names(client)).items()
-        }
-    return _cached_station_numbers
+    return lifespan_context.bus_client, lifespan_context.base_data
 
 
 async def get_station_number(
@@ -267,13 +238,12 @@ async def get_station_number(
         StationNumberResponse with success flag and matched station details,
         or None if the context is unavailable.
     """
-    client = _get_client_from_context(ctx)
+    _, base_data = _get_context_from_context(ctx)
 
     log.info("Getting station number for %s", station_name)
-    station_names = await _get_station_names(client)
 
     # First try exact match
-    station_number = station_names.get(station_name)
+    station_number = base_data.get_station_number(station_name)
     if station_number is not None:
         return StationNumberResponse(
             success=True, station_name=station_name, station_number=station_number
@@ -281,13 +251,10 @@ async def get_station_number(
 
     # If no exact match, try fuzzy matching
     log.info("No exact match found for %s, trying fuzzy matching", station_name)
-    closest_matches = difflib.get_close_matches(
-        station_name, station_names.keys(), n=1, cutoff=0.6
-    )
+    closest_station_number = base_data.find_station_number(station_name, cutoff=0.6)
 
-    if closest_matches:
-        closest_station = closest_matches[0]
-        closest_station_number = station_names[closest_station]
+    if closest_station_number is not None:
+        closest_station = base_data.get_station_name(closest_station_number)
         log.info(
             "Found closest match: %s (station number: %s)",
             closest_station,
@@ -317,9 +284,9 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
         TimeTableResponse with all timetables for the station, or None if the
         station is not found.
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
-    station_name = (await _get_station_numbers(client)).get(station_number)
+    station_name = base_data.get_station_name(station_number)
     if station_name is None:
         log.warning("Station number %s not found", station_number)
         return None
@@ -362,14 +329,14 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> ApproachBusStop:
+def _resolve_bus_stop(base_data: BaseData, bus_stop_code: str) -> ApproachBusStop:
     """Resolve bus stop code to station information."""
     if len(bus_stop_code) < 5 or not bus_stop_code[:5].isdigit():  # noqa: PLR2004
         msg = f"bus_stop_code must be at least 5 digits, got: {bus_stop_code!r}"
         raise ValueError(msg)
     station_number = int(bus_stop_code[:5].lstrip("0"))
-    station_name = (await _get_station_numbers(client)).get(station_number)
-    pole_name = (await _get_pole_names(client)).get(bus_stop_code)
+    station_name = base_data.get_station_name(station_number)
+    pole_name = base_data.get_pole_name(bus_stop_code)
     return ApproachBusStop(
         code=bus_stop_code,
         station_number=station_number,
@@ -389,7 +356,9 @@ def _normalize_route_name(name: str) -> str:
     return name.translate(_ROUTE_NAME_TRANSLATION_TABLE)
 
 
-async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInfo:
+async def _get_realtime_approach(
+    client: Client, base_data: BaseData, route_code: str
+) -> ApproachInfo:
     """Get real-time bus approach and position information for a route.
 
     This is a helper function that retrieves and processes real-time approach
@@ -401,9 +370,9 @@ async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInf
     bus_stop_codes: list[str] = keito.busstops
     approach = await client.get_realtime_approach(route_code)
 
-    bus_stops: list[ApproachBusStop] = await asyncio.gather(
-        *(_resolve_bus_stop(client, code) for code in bus_stop_codes)
-    )
+    bus_stops: list[ApproachBusStop] = [
+        _resolve_bus_stop(base_data, code) for code in bus_stop_codes
+    ]
     code_to_bus_stop = {bus_stop.code: bus_stop for bus_stop in bus_stops}
 
     latest_passes: dict[str, ApproachPosition] = {}
@@ -480,11 +449,11 @@ async def get_approach(
         RouteApproachResponse with latest passages and current positions, or None
         if no data is available.
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
     log.info("Getting real-time approach information for route code %s", route_code)
 
-    approach_info = await _get_realtime_approach(client, route_code)
+    approach_info = await _get_realtime_approach(client, base_data, route_code)
     bus_stops = [
         ApproachForRouteBusStop(
             code=bus_stop.code,
@@ -525,7 +494,7 @@ async def get_approach_for_station(
         ctx: FastMCP context containing the bus client.
         station_number: The station number to query (e.g., 22460).
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
     log.info(
         "Getting real-time approach information for station number %s", station_number
@@ -540,7 +509,10 @@ async def get_approach_for_station(
     approaches: list[tuple[int, ApproachForStationRoute]] = []
 
     approach_infos = await asyncio.gather(
-        *(_get_realtime_approach(client, route_code) for route_code, _ in route_codes)
+        *(
+            _get_realtime_approach(client, base_data, route_code)
+            for route_code, _ in route_codes
+        )
     )
 
     for (route_code, pole_code), approach_info in zip(
