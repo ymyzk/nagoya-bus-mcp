@@ -252,9 +252,6 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-_MAX_SORT_KEY = 2**32 - 1
-
-
 async def get_approach(
     ctx: Context, route_code: str
 ) -> ApproachForRouteResponse | None:
