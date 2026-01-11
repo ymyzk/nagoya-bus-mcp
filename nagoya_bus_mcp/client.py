@@ -94,6 +94,8 @@ class ApproachInfoResponse(BaseModel):
     model_config = _UPPER_ALIAS_CONFIG
 
     # e.g., {"71145/1E1": {"NS 0341": "14:24:32"}}
+    # NS 0341 passed the previous stop at 14:24:32
+    # and it's headed to stop with station 71145 and pole 1E1.
     latest_bus_pass: dict[str, dict[str, str]]
     current_bus_positions: dict[str, dict[str, str]]
 
@@ -196,7 +198,7 @@ class Client:
         self._check_404(response)
         return DiagramResponse.model_validate(response.json())
 
-    async def get_bus_stops(self, station_number: int) -> BusStopResponse:
+    async def get_bus_stop(self, station_number: int) -> BusStopResponse:
         """Get bus stop information for a specific station.
 
         Args:
@@ -214,7 +216,7 @@ class Client:
         self._check_404(response)
         return BusStopResponse.model_validate(response.json())
 
-    async def get_keitos(self, keito_code: str) -> KeitoResponse:
+    async def get_keito(self, keito_code: str) -> KeitoResponse:
         """Get route master information for a specific route.
 
         Args:
@@ -295,8 +297,7 @@ if __name__ == "__main__":
             print(await client.get_station_names())
             # 白川通大津
             print(await client.get_station_diagram(22460))
-            print(await client.get_bus_stops(22460))
-            print(await client.get_keitos("1123002"))
+            print(await client.get_keito("1123002"))
             print(await client.get_realtime_approach("1123002"))
 
     asyncio.run(main())
