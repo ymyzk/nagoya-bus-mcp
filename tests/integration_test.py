@@ -192,3 +192,84 @@ async def test_get_approach_not_found() -> None:
     async with Client(mcp_server) as client:
         with pytest.raises(ToolError, match="404 Not Found"):
             await client.call_tool("get_approach", {"route_code": "9999999"})
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_approach_for_station_succeeds_and_has_expected_structure() -> None:
+    async with Client(mcp_server) as client:
+        result = await client.call_tool(
+            "get_approach_for_station", {"station_number": NAGOYA_STATION_NUMBER}
+        )
+        data = result.data
+
+        # Basic structure checks
+        assert isinstance(data, dict)
+        assert "approaches" in data
+        assert "url" in data
+        assert isinstance(data["approaches"], list)
+        assert isinstance(data["url"], str)
+        assert "名古屋駅" in data["url"]
+
+        # If there are any approaches, validate their structure
+        if len(data["approaches"]) > 0:
+            approach = data["approaches"][0]
+            assert "route_code" in approach
+            assert "route_name" in approach
+            assert "direction" in approach
+            assert "pole" in approach
+            assert "last_pass_time" in approach
+            assert "approaching_buses" in approach
+
+            assert isinstance(approach["route_code"], str)
+            assert isinstance(approach["route_name"], str)
+            assert isinstance(approach["direction"], str)
+            assert isinstance(approach["pole"], str)
+            assert approach["last_pass_time"] is None or isinstance(
+                approach["last_pass_time"], str
+            )
+            assert isinstance(approach["approaching_buses"], list)
+
+            # Validate last_pass_time format if present
+            if approach["last_pass_time"] is not None:
+                assert re.match(r"^\d{2}:\d{2}:\d{2}$", approach["last_pass_time"])
+
+            # Validate approaching buses structure if present
+            for bus in approach["approaching_buses"]:
+                assert "location" in bus
+                assert "previous_station" in bus
+                assert "pass_time" in bus
+                assert isinstance(bus["location"], str)
+                assert isinstance(bus["previous_station"], str)
+                assert isinstance(bus["pass_time"], str)
+                assert re.match(r"^\d{2}:\d{2}:\d{2}$", bus["pass_time"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_approach_for_station_filters_routes_without_activity() -> None:
+    """Test that routes with no last pass time and no approaching buses are removed."""
+    async with Client(mcp_server) as client:
+        result = await client.call_tool(
+            "get_approach_for_station", {"station_number": NAGOYA_STATION_NUMBER}
+        )
+        data = result.data
+
+        # All returned approaches should have either a last pass time
+        # or approaching buses
+        for approach in data["approaches"]:
+            has_last_pass = approach["last_pass_time"] is not None
+            has_approaching_buses = len(approach["approaching_buses"]) > 0
+            assert has_last_pass or has_approaching_buses, (
+                "Each approach should have either last_pass_time or approaching_buses"
+            )
+
+
+@pytest.mark.asyncio
+@pytest.mark.integration
+async def test_get_approach_for_station_not_found() -> None:
+    async with Client(mcp_server) as client:
+        with pytest.raises(ToolError, match="404 Not Found"):
+            await client.call_tool(
+                "get_approach_for_station", {"station_number": 99999}
+            )

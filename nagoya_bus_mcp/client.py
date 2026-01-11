@@ -82,7 +82,8 @@ class KeitoResponse(BaseModel):
     from_: str = Field(alias="FROM")
     direction: str
     no: str
-    article: str
+    name: str  # e.g., "栄２３", "Ｃ－７５８"  # noqa: RUF003
+    article: str  # e.g., "地下鉄高畑経由"
     keito: str
     rosen: str
     busstops: list[str]

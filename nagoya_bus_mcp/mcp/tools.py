@@ -4,7 +4,7 @@ import asyncio
 import difflib
 from functools import reduce
 from logging import getLogger
-from operator import iadd
+from operator import iadd, itemgetter
 from typing import TYPE_CHECKING, Annotated, cast
 
 from fastmcp import Context
@@ -85,9 +85,59 @@ class ApproachPosition(BaseModel):
 class ApproachInfo(BaseModel):
     """Real-time approach information for a specific route."""
 
+    route: Annotated[str, Field(description="路線")]
+    direction: Annotated[str, Field(description="方面")]
     bus_stops: list[ApproachBusStop]
     latest_passes: dict[str, ApproachPosition]
     current_positions: list[ApproachPosition]
+
+    def _get_index_for_code(self, code: str) -> int | None:
+        """Get the index of a bus stop by its code.
+
+        Args:
+            code: The bus stop code to look up.
+        """
+        for i, bus_stop in enumerate(self.bus_stops):
+            if bus_stop.code == code:
+                return i
+        return None
+
+    def get_last_pass_time_for_code(self, code: str) -> str | None:
+        """Get the last pass time for a given bus stop code.
+
+        Args:
+            code: The bus stop code to look up.
+        """
+        if code in self.latest_passes:
+            return self.latest_passes[code].passed_time
+        return None
+
+    def get_bus_stop_for_code(self, code: str) -> ApproachBusStop | None:
+        """Get the bus stop information for a given bus stop code.
+
+        Args:
+            code: The bus stop code to look up.
+        """
+        index = self._get_index_for_code(code)
+        return None if index is None else self.bus_stops[index]
+
+    def get_current_positions_before_code(
+        self, code: str
+    ) -> list[tuple[int, ApproachPosition]]:
+        """Get the current bus positions before a given bus stop code.
+
+        Args:
+            code: The bus stop code to look up.
+        """
+        target_stop_index = self._get_index_for_code(code)
+        if target_stop_index is None:
+            return []
+        positions: list[tuple[int, ApproachPosition]] = []
+        for position in self.current_positions:
+            previous_stop_index = self.bus_stops.index(position.previous_stop)
+            if previous_stop_index < target_stop_index:
+                positions.append((target_stop_index - previous_stop_index, position))
+        return positions
 
 
 class ApproachForRouteBusStop(ApproachBusStop):
@@ -114,6 +164,38 @@ class ApproachForRouteResponse(BaseModel):
     bus_positions: Annotated[
         list[ApproachPosition], Field(description="現在走行中のバスの位置のリスト")
     ]
+
+
+class ApproachingBusForStationRoute(BaseModel):
+    """Real-time information about a bus approaching a station on a specific route."""
+
+    location: Annotated[str, Field(description="バスの現在位置の説明")]
+    previous_station: Annotated[str, Field(description="直前に通過したバス停名")]
+    pass_time: Annotated[str, Field(description="直前のバス停の通過時刻(HH:MM:SS形式)")]
+
+
+class ApproachForStationRoute(BaseModel):
+    """Real-time approach information for a specific route at a station."""
+
+    route_code: Annotated[str, Field(description="路線コード")]
+    route_name: Annotated[str, Field(description="路線名")]
+    direction: Annotated[str, Field(description="方面")]
+    pole: Annotated[str, Field(description="乗り場")]
+    last_pass_time: Annotated[str | None, Field(description="最終通過時刻")] = None
+    approaching_buses: Annotated[
+        list[ApproachingBusForStationRoute], Field(description="接近中のバスの情報")
+    ]
+
+
+class ApproachForStationResponse(BaseModel):
+    """Real-time approach information for a specific station.
+
+    Contains the latest bus passage information and current bus positions
+    for the specified station.
+    """
+
+    approaches: list[ApproachForStationRoute]
+    url: str
 
 
 _cached_pole_names: dict[str, str] | None = None
@@ -296,14 +378,27 @@ async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> ApproachBusSt
     )
 
 
+_ROUTE_NAME_TRANSLATION_TABLE = str.maketrans(
+    "１２３４５６７８９０Ｃ－",  # noqa: RUF001
+    "1234567890C-",
+)
+
+
+def _normalize_route_name(name: str) -> str:
+    """Normalize route names by converting full-width characters to half-width."""
+    return name.translate(_ROUTE_NAME_TRANSLATION_TABLE)
+
+
 async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInfo:
     """Get real-time bus approach and position information for a route.
 
     This is a helper function that retrieves and processes real-time approach
     data for a given route code.
     """
+    keito = await client.get_keito(route_code)
+
     # e.g., ["62185701", "71060701", "31165701", ...]
-    bus_stop_codes: list[str] = (await client.get_keito(route_code)).busstops
+    bus_stop_codes: list[str] = keito.busstops
     approach = await client.get_realtime_approach(route_code)
 
     bus_stops: list[ApproachBusStop] = await asyncio.gather(
@@ -354,7 +449,15 @@ async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInf
                 )
             )
 
+    direction = (
+        f"{keito.from_}発 {keito.article} {keito.to}行き"
+        if keito.article
+        else f"{keito.from_}発 {keito.to}行き"
+    )
+
     return ApproachInfo(
+        route=_normalize_route_name(keito.name),
+        direction=direction,
         bus_stops=bus_stops,
         latest_passes=latest_passes,
         current_positions=current_positions,
@@ -398,4 +501,90 @@ async def get_approach(
     return ApproachForRouteResponse(
         bus_stops=bus_stops,
         bus_positions=approach_info.current_positions,
+    )
+
+
+_MAX_SORT_KEY = 2**32 - 1
+
+
+async def get_approach_for_station(
+    ctx: Context, station_number: int
+) -> ApproachForStationResponse | None:
+    """Get real-time bus approach information for all routes at a station.
+
+    Provides a list of routes that currently have activity at the specified
+    station (either a recent passage time or at least one approaching bus),
+    along with a URL for more details.
+
+    Routes that have neither a latest pass time nor any approaching buses are
+    filtered out and are not included in the result. The remaining routes are
+    sorted by the proximity of their approaching buses so that routes with the
+    nearest approaching vehicles appear first.
+
+    Args:
+        ctx: FastMCP context containing the bus client.
+        station_number: The station number to query (e.g., 22460).
+    """
+    client = _get_client_from_context(ctx)
+
+    log.info(
+        "Getting real-time approach information for station number %s", station_number
+    )
+
+    bus_stop = await client.get_bus_stop(station_number)
+    station_name = bus_stop.name
+    route_codes = [
+        (keito, pole.code) for pole in bus_stop.poles for keito in pole.keitos
+    ]
+
+    approaches: list[tuple[int, ApproachForStationRoute]] = []
+
+    approach_infos = await asyncio.gather(
+        *(_get_realtime_approach(client, route_code) for route_code, _ in route_codes)
+    )
+
+    for (route_code, pole_code), approach_info in zip(
+        route_codes, approach_infos, strict=True
+    ):
+        sort_key = _MAX_SORT_KEY
+        bus_stop_code = f"{station_number:05}{pole_code}"
+        approach_bus_stop = approach_info.get_bus_stop_for_code(bus_stop_code)
+
+        approaching_buses: list[ApproachingBusForStationRoute] = []
+        positions_before = approach_info.get_current_positions_before_code(
+            bus_stop_code
+        )
+        for n, position in positions_before:
+            sort_key = min(sort_key, n)
+            approaching_buses.append(
+                ApproachingBusForStationRoute(
+                    location=f"{n}停前を通過",
+                    previous_station=position.previous_stop.station_name,
+                    pass_time=position.passed_time,
+                )
+            )
+
+        last_pass_time = approach_info.get_last_pass_time_for_code(bus_stop_code)
+
+        if last_pass_time is None and len(approaching_buses) == 0:
+            continue
+
+        approaches.append(
+            (
+                sort_key,
+                ApproachForStationRoute(
+                    route_code=route_code,
+                    route_name=approach_info.route,
+                    direction=approach_info.direction,
+                    last_pass_time=last_pass_time,
+                    pole=approach_bus_stop.pole_name
+                    if approach_bus_stop
+                    else "不明なのりば",
+                    approaching_buses=approaching_buses,
+                ),
+            )
+        )
+    return ApproachForStationResponse(
+        approaches=[approach for _, approach in sorted(approaches, key=itemgetter(0))],
+        url=f"https://www.kotsu.city.nagoya.jp/jp/pc/BUS/stand_access.html?name={station_name}",
     )
