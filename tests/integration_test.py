@@ -144,9 +144,11 @@ async def test_get_timetable_not_found() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_get_approach_succeeds_and_has_expected_structure() -> None:
+async def test_get_approach_for_route_succeeds_and_has_expected_structure() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool("get_approach", {"route_code": ROUTE_CODE})
+        result = await client.call_tool(
+            "get_approach_for_route", {"route_code": ROUTE_CODE}
+        )
         data = result.data
 
         # Basic structure checks
@@ -188,10 +190,10 @@ async def test_get_approach_succeeds_and_has_expected_structure() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.integration
-async def test_get_approach_not_found() -> None:
+async def test_get_approach_for_route_not_found() -> None:
     async with Client(mcp_server) as client:
         with pytest.raises(ToolError, match="404 Not Found"):
-            await client.call_tool("get_approach", {"route_code": "9999999"})
+            await client.call_tool("get_approach_for_route", {"route_code": "9999999"})
 
 
 @pytest.mark.asyncio

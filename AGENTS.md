@@ -98,7 +98,7 @@ nagoya_bus_mcp/
   - `get_timetable`: Returns formatted timetables by station
   - `get_busstop_info`: Returns pole/boarding location info
   - `get_route_master`: Returns route metadata (stops, direction, etc.)
-  - `get_approach`: Returns real-time bus approach information
+  - `get_approach_for_route`: Returns real-time bus approach information
 - Global caching: Station names, route masters, and bus stops are cached in module-level variables to reduce API calls
 
 **Data Flow**

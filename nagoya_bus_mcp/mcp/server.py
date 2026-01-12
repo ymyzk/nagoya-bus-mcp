@@ -11,7 +11,7 @@ from nagoya_bus_mcp.client import Client
 from nagoya_bus_mcp.data import BaseData, init_base_data
 from nagoya_bus_mcp.mcp.prompts import ask_bus_approach, ask_timetable
 from nagoya_bus_mcp.mcp.tools import (
-    get_approach,
+    get_approach_for_route,
     get_approach_for_station,
     get_station_number,
     get_timetable,
@@ -80,7 +80,7 @@ def build_mcp_server(settings: Settings) -> FastMCP:
     mcp_server: FastMCP = FastMCP("Nagoya Bus MCP", version=version, lifespan=lifespan)
     mcp_server.tool(get_station_number)
     mcp_server.tool(get_timetable)
-    mcp_server.tool(get_approach)
+    mcp_server.tool(get_approach_for_route)
     mcp_server.tool(get_approach_for_station)
     mcp_server.prompt(ask_timetable)
     mcp_server.prompt(ask_bus_approach)

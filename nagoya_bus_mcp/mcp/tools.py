@@ -252,7 +252,7 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-async def get_approach(
+async def get_approach_for_route(
     ctx: Context, route_code: str
 ) -> ApproachForRouteResponse | None:
     """Get real-time bus approach and position information for a route.
