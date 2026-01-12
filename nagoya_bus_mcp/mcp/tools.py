@@ -7,6 +7,7 @@ from operator import iadd, itemgetter
 from typing import TYPE_CHECKING, Annotated, cast
 
 from fastmcp import Context
+from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, Field
 
 from nagoya_bus_mcp.approach import (
@@ -30,9 +31,8 @@ class StationNumberResponse(BaseModel):
     including fuzzy matching outcomes.
     """
 
-    success: bool
-    station_name: str | None = None
-    station_number: int | None = None
+    station_name: str
+    station_number: int
 
 
 class TimeTable(BaseModel):
@@ -145,9 +145,7 @@ def _get_context_from_context(ctx: Context) -> tuple[Client, BaseData]:
     return lifespan_context.bus_client, lifespan_context.base_data
 
 
-async def get_station_number(
-    ctx: Context, station_name: str
-) -> StationNumberResponse | None:
+async def get_station_number(ctx: Context, station_name: str) -> StationNumberResponse:
     """Get station number for a given station name using fuzzy matching.
 
     Attempts exact match first, then falls back to fuzzy matching with 60%
@@ -158,25 +156,27 @@ async def get_station_number(
         station_name: The station name to look up (e.g., "名古屋駅").
 
     Returns:
-        StationNumberResponse with success flag and matched station details,
-        or None if the context is unavailable.
+        StationNumberResponse with matched station details.
+
+    Raises:
+        ToolError: If no station matches the given name.
     """
     _, base_data = _get_context_from_context(ctx)
 
     log.info("Getting station number for %s", station_name)
 
     # First try exact match
-    station_number = base_data.get_station_number(station_name)
-    if station_number is not None:
+    if station_number := base_data.get_station_number(station_name):
         return StationNumberResponse(
-            success=True, station_name=station_name, station_number=station_number
+            station_name=station_name, station_number=station_number
         )
 
     # If no exact match, try fuzzy matching
     log.info("No exact match found for %s, trying fuzzy matching", station_name)
-    closest_station_number = base_data.find_station_number(station_name, cutoff=0.6)
 
-    if closest_station_number is not None:
+    if closest_station_number := base_data.find_station_number(
+        station_name, cutoff=0.6
+    ):
         closest_station = base_data.get_station_name(closest_station_number)
         log.info(
             "Found closest match: %s (station number: %s)",
@@ -184,16 +184,16 @@ async def get_station_number(
             closest_station_number,
         )
         return StationNumberResponse(
-            success=True,
             station_name=closest_station,
             station_number=closest_station_number,
         )
 
     log.info("No fuzzy match found for %s", station_name)
-    return StationNumberResponse(success=False)
+    msg = f"Station not found: {station_name}"
+    raise ToolError(msg)
 
 
-async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse | None:
+async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse:
     """Get formatted timetable information for all routes at a station.
 
     Retrieves and formats timetable data including routes, directions, boarding
@@ -204,23 +204,21 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
         station_number: The station number to query (e.g., 22460).
 
     Returns:
-        TimeTableResponse with all timetables for the station, or None if the
-        station is not found.
+        TimeTableResponse with all timetables for the station.
+
+    Raises:
+        ToolError: If the station number is not found in base data.
     """
     client, base_data = _get_context_from_context(ctx)
 
     station_name = base_data.get_station_name(station_number)
     if station_name is None:
         log.warning("Station number %s not found", station_number)
-        return None
+        msg = f"Station number not found: {station_number}"
+        raise ToolError(msg)
 
     log.info("Getting timetable for station number %s", station_number)
     diagram_response = await client.get_station_diagram(station_number)
-    if not diagram_response.root:
-        log.error(
-            "Failed to get station diagram for %s (%s)", station_name, station_number
-        )
-        return None
 
     timetables: list[TimeTable] = []
     for line, railways in diagram_response.root.items():
@@ -254,7 +252,7 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
 
 async def get_approach_for_route(
     ctx: Context, route_code: str
-) -> ApproachForRouteResponse | None:
+) -> ApproachForRouteResponse:
     """Get real-time bus approach and position information for a route.
 
     Provides both historical data (latest bus passages at stops) and current
@@ -297,7 +295,7 @@ _MAX_SORT_KEY = 2**32 - 1
 
 async def get_approach_for_station(
     ctx: Context, station_number: int
-) -> ApproachForStationResponse | None:
+) -> ApproachForStationResponse:
     """Get real-time bus approach information for all routes at a station.
 
     Provides a list of routes that currently have activity at the specified

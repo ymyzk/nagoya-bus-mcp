@@ -27,8 +27,7 @@ async def test_get_station_names_succeeds() -> None:
         result = await client.call_tool(
             "get_station_number", {"station_name": "名古屋駅"}
         )
-        assert result.data == {
-            "success": True,
+        assert result.structured_content == {
             "station_name": "名古屋駅",
             "station_number": NAGOYA_STATION_NUMBER,
         }
@@ -41,8 +40,7 @@ async def test_get_station_names_runs_fuzzy_matching() -> None:
         result = await client.call_tool(
             "get_station_number", {"station_name": "名古駅"}
         )
-        assert result.data == {
-            "success": True,
+        assert result.structured_content == {
             "station_name": "名古屋駅",
             "station_number": NAGOYA_STATION_NUMBER,
         }
@@ -52,14 +50,10 @@ async def test_get_station_names_runs_fuzzy_matching() -> None:
 @pytest.mark.integration
 async def test_get_station_names_runs_not_found() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool(
-            "get_station_number", {"station_name": "存在しないバス停"}
-        )
-        assert result.data == {
-            "success": False,
-            "station_name": None,
-            "station_number": None,
-        }
+        with pytest.raises(ToolError, match="Station not found: 存在しないバス停"):
+            await client.call_tool(
+                "get_station_number", {"station_name": "存在しないバス停"}
+            )
 
 
 @pytest.mark.asyncio
@@ -69,7 +63,7 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
         result = await client.call_tool(
             "get_timetable", {"station_number": NAGOYA_STATION_NUMBER}
         )
-        data = result.data
+        data = result.structured_content
 
         # Basic structure checks
         assert isinstance(data, dict)
@@ -122,8 +116,9 @@ async def test_get_timetable_all_entries_have_valid_time_format() -> None:
         result = await client.call_tool(
             "get_timetable", {"station_number": NAGOYA_STATION_NUMBER}
         )
-        data = result.data
+        data = result.structured_content
 
+        assert data is not None
         for tt in data["timetables"]:
             assert isinstance(tt["timetable"], dict)
             for day, times in tt["timetable"].items():
@@ -138,8 +133,8 @@ async def test_get_timetable_all_entries_have_valid_time_format() -> None:
 @pytest.mark.integration
 async def test_get_timetable_not_found() -> None:
     async with Client(mcp_server) as client:
-        result = await client.call_tool("get_timetable", {"station_number": 123456789})
-        assert result.data is None, "Expected None for non-existent station number"
+        with pytest.raises(ToolError, match="Station number not found: 123456789"):
+            await client.call_tool("get_timetable", {"station_number": 123456789})
 
 
 @pytest.mark.asyncio
@@ -149,7 +144,7 @@ async def test_get_approach_for_route_succeeds_and_has_expected_structure() -> N
         result = await client.call_tool(
             "get_approach_for_route", {"route_code": ROUTE_CODE}
         )
-        data = result.data
+        data = result.structured_content
 
         # Basic structure checks
         assert isinstance(data, dict)
@@ -203,7 +198,7 @@ async def test_get_approach_for_station_succeeds_and_has_expected_structure() ->
         result = await client.call_tool(
             "get_approach_for_station", {"station_number": NAGOYA_STATION_NUMBER}
         )
-        data = result.data
+        data = result.structured_content
 
         # Basic structure checks
         assert isinstance(data, dict)
@@ -255,10 +250,11 @@ async def test_get_approach_for_station_filters_routes_without_activity() -> Non
         result = await client.call_tool(
             "get_approach_for_station", {"station_number": NAGOYA_STATION_NUMBER}
         )
-        data = result.data
+        data = result.structured_content
 
         # All returned approaches should have either a last pass time
         # or approaching buses
+        assert data is not None
         for approach in data["approaches"]:
             has_last_pass = approach["last_pass_time"] is not None
             has_approaching_buses = len(approach["approaching_buses"]) > 0
