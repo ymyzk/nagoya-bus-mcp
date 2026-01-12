@@ -17,10 +17,10 @@ class ApproachBusStop(BaseModel):
     Contains the code, station name, station number, and pole name.
     """
 
-    code: Annotated[str, Field(description="コード (例: 02200702)")]
-    station_number: Annotated[int, Field(description="バス停番号 (例: 02200)")]
+    bus_stop_code: Annotated[str, Field(description="のりばコード (例: 02200702)")]
+    station_number: Annotated[int, Field(description="バス停番号 (例: 2200)")]
     station_name: Annotated[str, Field(description="バス停名")]
-    pole_name: Annotated[str, Field(description="乗り場名")]
+    pole: Annotated[str, Field(description="のりば")]
 
 
 class ApproachPosition(BaseModel):
@@ -29,19 +29,22 @@ class ApproachPosition(BaseModel):
     Contains the car code, previous stop, next stop, and passed time.
     """
 
-    car_code: str
-    previous_stop: ApproachBusStop
+    car_code: Annotated[str, Field(description="車両コード")]
+    previous_stop: Annotated[ApproachBusStop, Field(description="直前に通過したのりば")]
     passed_time: Annotated[str, Field(description="通過時刻(HH:MM:SS形式)")]
-    next_stop: ApproachBusStop
+    next_stop: Annotated[ApproachBusStop, Field(description="次に通過するのりば")]
 
 
 class ApproachInfo(BaseModel):
     """Real-time approach information for a specific route."""
 
-    route: Annotated[str, Field(description="路線")]
-    direction: Annotated[str, Field(description="方面")]
+    route: Annotated[str, Field(description="系統")]
+    direction: Annotated[str, Field(description="行き先")]
     bus_stops: list[ApproachBusStop]
-    latest_passes: dict[str, ApproachPosition]
+    latest_passes: Annotated[
+        dict[Annotated[str, Field(description="のりばコード")], ApproachPosition],
+        Field(description="各のりばの最新通過情報"),
+    ]
     current_positions: list[ApproachPosition]
 
     def _get_index_for_code(self, code: str) -> int | None:
@@ -51,7 +54,7 @@ class ApproachInfo(BaseModel):
             code: The bus stop code to look up.
         """
         for i, bus_stop in enumerate(self.bus_stops):
-            if bus_stop.code == code:
+            if bus_stop.bus_stop_code == code:
                 return i
         return None
 
@@ -102,10 +105,10 @@ def _resolve_bus_stop(base_data: BaseData, bus_stop_code: str) -> ApproachBusSto
     station_name = base_data.get_station_name(station_number)
     pole_name = base_data.get_pole_name(bus_stop_code)
     return ApproachBusStop(
-        code=bus_stop_code,
+        bus_stop_code=bus_stop_code,
         station_number=station_number,
         station_name=station_name or "不明なバス停",
-        pole_name=pole_name or "不明なのりば",
+        pole=pole_name or "不明なのりば",
     )
 
 
@@ -146,7 +149,7 @@ async def get_realtime_approach(
     bus_stops: list[ApproachBusStop] = [
         _resolve_bus_stop(base_data, code) for code in bus_stop_codes
     ]
-    code_to_bus_stop = {bus_stop.code: bus_stop for bus_stop in bus_stops}
+    code_to_bus_stop = {bus_stop.bus_stop_code: bus_stop for bus_stop in bus_stops}
 
     latest_passes: dict[str, ApproachPosition] = {}
     for station_pole_with_slash, passed_cars in approach.latest_bus_pass.items():
