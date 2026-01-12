@@ -71,6 +71,8 @@ uv build
 nagoya_bus_mcp/
 ├── __main__.py           # Entry point for the MCP server
 ├── client.py             # HTTP client for Nagoya Bus API
+├── approach.py           # Wrapper and utilities for real-time approach information
+├── data.py               # Common base data (stations, poles) with caching
 ├── mcp/
 │   ├── server.py         # FastMCP server initialization and lifespan
 │   ├── tools.py          # MCP tool implementations
@@ -89,21 +91,33 @@ nagoya_bus_mcp/
 
 **MCP Server (`mcp/server.py`)**
 - Uses FastMCP for MCP server implementation
-- Lifespan context pattern: Maintains a single `Client` instance shared across all tool calls
+- Lifespan context pattern: Maintains a single `Client` instance and `BaseData` instance shared across all tool calls
+- Server is built via `build_mcp_server()` function that accepts a `Settings` object
 - Tools and prompts are registered via decorators on the `mcp_server` instance
 
 **MCP Tools (`mcp/tools.py`)**
-- Five main tools exposed to MCP clients:
+- Four main tools exposed to MCP clients:
   - `get_station_number`: Fuzzy matching for station names (uses `difflib`)
   - `get_timetable`: Returns formatted timetables by station
-  - `get_busstop_info`: Returns pole/boarding location info
-  - `get_route_master`: Returns route metadata (stops, direction, etc.)
-  - `get_approach_for_route`: Returns real-time bus approach information
-- Global caching: Station names, route masters, and bus stops are cached in module-level variables to reduce API calls
+  - `get_approach_for_route`: Returns real-time bus approach and position information for a route
+  - `get_approach_for_station`: Returns real-time bus approach information for all routes at a station
+- Base data caching: Station names and pole information are cached in the `BaseData` instance (initialized at startup) to reduce API calls
+
+**Base Data Management (`data.py`)**
+- `BaseData`: Centralized class for managing station and pole information
+- Initialized during server startup via `init_base_data()` and stored in lifespan context
+- Provides fast lookup methods: `get_station_number()`, `get_station_name()`, `get_pole_name()`, `find_station_number()`
+- Uses fuzzy matching with `difflib` for station name searches
+
+**Approach Processing (`approach.py`)**
+- `get_realtime_approach()`: Processes real-time bus approach data for a route
+- `ApproachInfo`: Model containing route, direction, bus stops, latest passes, and current positions
+- Resolves bus stop codes to human-readable station/pole names using `BaseData`
+- Used by both `get_approach_for_route` and `get_approach_for_station` tools
 
 **Data Flow**
 1. MCP client calls a tool (e.g., `get_timetable`)
-2. Tool accesses `Client` instance from `ctx.request_context.lifespan_context.bus_client`
+2. Tool accesses `Client` instance from `ctx.request_context.lifespan_context.bus_client` and `BaseData` from `ctx.request_context.lifespan_context.base_data`
 3. Client makes async HTTP request to Nagoya City bus API
 4. Response is validated via Pydantic models
 5. Tool transforms and returns data in MCP-friendly format
@@ -124,6 +138,6 @@ nagoya_bus_mcp/
 ### Code Patterns
 
 - All API client methods are async and should be awaited
-- Use the lifespan context to access the shared `Client` instance in tools
+- Use the lifespan context to access the shared `Client` and `BaseData` instances in tools via `_get_context_from_context(ctx)`
 - Prefer extending existing Pydantic models over manual dict manipulation
-- Follow the existing caching pattern in `tools.py` when adding new endpoints
+- Use `BaseData` methods for station/pole lookups instead of direct API calls when possible
