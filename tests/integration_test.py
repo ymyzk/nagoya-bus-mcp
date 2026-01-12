@@ -82,7 +82,7 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
             "route_codes",
             "direction",
             "pole",
-            "stop_stations",
+            "stop_station_names",
             "timetable",
             "url",
         }.issubset(tt.keys())
@@ -93,9 +93,9 @@ async def test_get_timetable_succeeds_and_has_expected_structure() -> None:
         assert all(isinstance(rc, int) and rc for rc in tt["route_codes"])
         assert isinstance(tt["direction"], str)
         assert isinstance(tt["pole"], str)
-        assert isinstance(tt["stop_stations"], list)
-        assert len(tt["stop_stations"]) > 0
-        assert all(isinstance(s, str) and s for s in tt["stop_stations"])
+        assert isinstance(tt["stop_station_names"], list)
+        assert len(tt["stop_station_names"]) > 0
+        assert all(isinstance(s, str) and s for s in tt["stop_station_names"])
         assert isinstance(tt["timetable"], dict)
         assert isinstance(tt["url"], str)
         assert "timetable_dtl.html" in tt["url"]
@@ -157,10 +157,10 @@ async def test_get_approach_for_route_succeeds_and_has_expected_structure() -> N
         for bus_stop in data["bus_stops"]:
             assert "station_number" in bus_stop
             assert "station_name" in bus_stop
-            assert "pole_name" in bus_stop
+            assert "pole" in bus_stop
             assert isinstance(bus_stop["station_number"], int)
             assert isinstance(bus_stop["station_name"], str)
-            assert isinstance(bus_stop["pole_name"], str)
+            assert isinstance(bus_stop["pole"], str)
 
         # Validate bus_positions structure
         for bus_position in data["bus_positions"]:
@@ -177,10 +177,10 @@ async def test_get_approach_for_route_succeeds_and_has_expected_structure() -> N
             for stop in [bus_position["previous_stop"], bus_position["next_stop"]]:
                 assert "station_number" in stop
                 assert "station_name" in stop
-                assert "pole_name" in stop
+                assert "pole" in stop
                 assert isinstance(stop["station_number"], int)
                 assert isinstance(stop["station_name"], str)
-                assert isinstance(stop["pole_name"], str)
+                assert isinstance(stop["pole"], str)
 
 
 @pytest.mark.asyncio
@@ -202,24 +202,24 @@ async def test_get_approach_for_station_succeeds_and_has_expected_structure() ->
 
         # Basic structure checks
         assert isinstance(data, dict)
-        assert "approaches" in data
+        assert "routes" in data
         assert "url" in data
-        assert isinstance(data["approaches"], list)
+        assert isinstance(data["routes"], list)
         assert isinstance(data["url"], str)
         assert "名古屋駅" in data["url"]
 
-        # If there are any approaches, validate their structure
-        if len(data["approaches"]) > 0:
-            approach = data["approaches"][0]
+        # If there are any routes, validate their structure
+        if len(data["routes"]) > 0:
+            approach = data["routes"][0]
             assert "route_code" in approach
-            assert "route_name" in approach
+            assert "route" in approach
             assert "direction" in approach
             assert "pole" in approach
             assert "last_pass_time" in approach
             assert "approaching_buses" in approach
 
             assert isinstance(approach["route_code"], str)
-            assert isinstance(approach["route_name"], str)
+            assert isinstance(approach["route"], str)
             assert isinstance(approach["direction"], str)
             assert isinstance(approach["pole"], str)
             assert approach["last_pass_time"] is None or isinstance(
@@ -234,10 +234,10 @@ async def test_get_approach_for_station_succeeds_and_has_expected_structure() ->
             # Validate approaching buses structure if present
             for bus in approach["approaching_buses"]:
                 assert "location" in bus
-                assert "previous_station" in bus
+                assert "previous_station_name" in bus
                 assert "pass_time" in bus
                 assert isinstance(bus["location"], str)
-                assert isinstance(bus["previous_station"], str)
+                assert isinstance(bus["previous_station_name"], str)
                 assert isinstance(bus["pass_time"], str)
                 assert re.match(r"^\d{2}:\d{2}:\d{2}$", bus["pass_time"])
 
@@ -252,10 +252,10 @@ async def test_get_approach_for_station_filters_routes_without_activity() -> Non
         )
         data = result.structured_content
 
-        # All returned approaches should have either a last pass time
+        # All returned routes should have either a last pass time
         # or approaching buses
         assert data is not None
-        for approach in data["approaches"]:
+        for approach in data["routes"]:
             has_last_pass = approach["last_pass_time"] is not None
             has_approaching_buses = len(approach["approaching_buses"]) > 0
             assert has_last_pass or has_approaching_buses, (

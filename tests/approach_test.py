@@ -49,22 +49,22 @@ def sample_bus_stops() -> list[ApproachBusStop]:
     """Fixture providing sample bus stops."""
     return [
         ApproachBusStop(
-            code="41025701",
+            bus_stop_code="41025701",
             station_number=41025,
             station_name="中川車庫前",
-            pole_name="1番",
+            pole="1番",
         ),
         ApproachBusStop(
-            code="52025701",
+            bus_stop_code="52025701",
             station_number=52025,
             station_name="野田",
-            pole_name="1番",
+            pole="1番",
         ),
         ApproachBusStop(
-            code="31090101",
+            bus_stop_code="31090101",
             station_number=31090,
             station_name="栄",
-            pole_name="1番",
+            pole="1番",
         ),
     ]
 
@@ -127,12 +127,12 @@ class TestApproachInfo:
         """Test get_bus_stop_for_code with existing code."""
         bus_stop = sample_approach_info.get_bus_stop_for_code("41025701")
         assert bus_stop is not None
-        assert bus_stop.code == "41025701"
+        assert bus_stop.bus_stop_code == "41025701"
         assert bus_stop.station_name == "中川車庫前"
 
         bus_stop = sample_approach_info.get_bus_stop_for_code("31090101")
         assert bus_stop is not None
-        assert bus_stop.code == "31090101"
+        assert bus_stop.bus_stop_code == "31090101"
         assert bus_stop.station_name == "栄"
 
     def test_get_bus_stop_for_code_not_found(
@@ -153,12 +153,12 @@ class TestApproachInfo:
         # First position: 2 stops away (from index 0 to 2)
         assert positions[0][0] == 2
         assert positions[0][1].car_code == "NF 0612"
-        assert positions[0][1].previous_stop.code == "41025701"
+        assert positions[0][1].previous_stop.bus_stop_code == "41025701"
 
         # Second position: 1 stop away (from index 1 to 2)
         assert positions[1][0] == 1
         assert positions[1][1].car_code == "NF 0613"
-        assert positions[1][1].previous_stop.code == "52025701"
+        assert positions[1][1].previous_stop.bus_stop_code == "52025701"
 
     def test_get_current_positions_before_code_middle_stop(
         self, sample_approach_info: ApproachInfo
@@ -171,7 +171,7 @@ class TestApproachInfo:
         # Only one position before this stop (from index 0 to 1)
         assert positions[0][0] == 1
         assert positions[0][1].car_code == "NF 0612"
-        assert positions[0][1].previous_stop.code == "41025701"
+        assert positions[0][1].previous_stop.bus_stop_code == "41025701"
 
     def test_get_current_positions_before_code_first_stop(
         self, sample_approach_info: ApproachInfo
@@ -261,9 +261,9 @@ class TestGetRealtimeApproach:
         assert result.route == "栄23"
         assert result.direction == "中川車庫前発 栄行き"
         assert len(result.bus_stops) == 3
-        assert result.bus_stops[0].code == "11015301"
-        assert result.bus_stops[1].code == "45055301"
-        assert result.bus_stops[2].code == "210101E1"
+        assert result.bus_stops[0].bus_stop_code == "11015301"
+        assert result.bus_stops[1].bus_stop_code == "45055301"
+        assert result.bus_stops[2].bus_stop_code == "210101E1"
 
         # Verify mock calls
         mock_client.get_keito.assert_called_once_with("1123002")

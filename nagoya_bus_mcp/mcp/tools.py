@@ -31,8 +31,8 @@ class StationNumberResponse(BaseModel):
     including fuzzy matching outcomes.
     """
 
-    station_name: str
-    station_number: int
+    station_name: Annotated[str, Field(description="バス停名")]
+    station_number: Annotated[int, Field(description="バス停番号")]
 
 
 class TimeTable(BaseModel):
@@ -42,13 +42,13 @@ class TimeTable(BaseModel):
     organized by day of week.
     """
 
-    route: Annotated[str, Field(description="路線")]
-    route_codes: Annotated[list[int], Field(description="路線コードのリスト")]
-    direction: Annotated[str, Field(description="方面")]
-    pole: Annotated[str, Field(description="乗り場")]
-    stop_stations: Annotated[list[str], Field(description="停車バス停のリスト")]
+    route: Annotated[str, Field(description="系統")]
+    route_codes: Annotated[list[int], Field(description="系統コードのリスト")]
+    direction: Annotated[str, Field(description="行き先")]
+    pole: Annotated[str, Field(description="のりば")]
+    stop_station_names: Annotated[list[str], Field(description="停車バス停名のリスト")]
     timetable: Annotated[dict[str, list[str]], Field(description="曜日別の時刻表")]
-    url: str
+    url: Annotated[str, Field(description="系統の時刻表のURL")]
 
 
 class TimeTableResponse(BaseModel):
@@ -58,9 +58,9 @@ class TimeTableResponse(BaseModel):
     along with the station identifier and reference URL.
     """
 
-    station_number: int
+    station_number: Annotated[int, Field(description="バス停番号")]
     timetables: list[TimeTable]
-    url: str
+    url: Annotated[str, Field(description="系統別の時刻表一覧のURL")]
 
 
 class ApproachForRouteBusStop(ApproachBusStop):
@@ -82,7 +82,7 @@ class ApproachForRouteResponse(BaseModel):
 
     bus_stops: Annotated[
         list[ApproachForRouteBusStop],
-        Field(description="通過時間を含む、路線のバス停のリスト"),
+        Field(description="通過時間を含む、系統のバス停のリスト"),
     ]
     bus_positions: Annotated[
         list[ApproachPosition], Field(description="現在走行中のバスの位置のリスト")
@@ -92,19 +92,21 @@ class ApproachForRouteResponse(BaseModel):
 class ApproachingBusForStationRoute(BaseModel):
     """Real-time information about a bus approaching a station on a specific route."""
 
-    location: Annotated[str, Field(description="バスの現在位置の説明")]
-    previous_station: Annotated[str, Field(description="直前に通過したバス停名")]
+    location: Annotated[str, Field(description="接近中のバスの現在位置の説明")]
+    previous_station_name: Annotated[str, Field(description="直前に通過したバス停名")]
     pass_time: Annotated[str, Field(description="直前のバス停の通過時刻(HH:MM:SS形式)")]
 
 
 class ApproachForStationRoute(BaseModel):
     """Real-time approach information for a specific route at a station."""
 
-    route_code: Annotated[str, Field(description="路線コード")]
-    route_name: Annotated[str, Field(description="路線名")]
-    direction: Annotated[str, Field(description="方面")]
-    pole: Annotated[str, Field(description="乗り場")]
-    last_pass_time: Annotated[str | None, Field(description="最終通過時刻")] = None
+    route: Annotated[str, Field(description="系統")]
+    route_code: Annotated[str, Field(description="系統コード")]
+    direction: Annotated[str, Field(description="行き先")]
+    pole: Annotated[str, Field(description="のりば")]
+    last_pass_time: Annotated[
+        str | None, Field(description="前回のバスがのりばを通過した時刻 (HH:MM:SS形式)")
+    ] = None
     approaching_buses: Annotated[
         list[ApproachingBusForStationRoute], Field(description="接近中のバスの情報")
     ]
@@ -117,8 +119,10 @@ class ApproachForStationResponse(BaseModel):
     for the specified station.
     """
 
-    approaches: list[ApproachForStationRoute]
-    url: str
+    routes: Annotated[
+        list[ApproachForStationRoute], Field(description="接近情報のある系統のリスト")
+    ]
+    url: Annotated[str, Field(description="バス停の接近情報のURL")]
 
 
 def _get_context_from_context(ctx: Context) -> tuple[Client, BaseData]:
@@ -236,7 +240,7 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse:
                     route_codes=(
                         railway.railway_ids  # pyrefly: ignore[bad-argument-type]
                     ),
-                    stop_stations=reduce(iadd, railway.stations, []),
+                    stop_station_names=reduce(iadd, railway.stations, []),
                     pole=railway.polename,
                     timetable=diagram,
                     url=f"{client.base_url}/jp/pc/bus/timetable_dtl.html?name={station_name}&keito={line}&lineindex={railway_index}",
@@ -273,12 +277,14 @@ async def get_approach_for_route(
     approach_info = await get_realtime_approach(client, base_data, route_code)
     bus_stops = [
         ApproachForRouteBusStop(
-            code=bus_stop.code,
+            bus_stop_code=bus_stop.bus_stop_code,
             station_number=bus_stop.station_number,
             station_name=bus_stop.station_name,
-            pole_name=bus_stop.pole_name,
-            last_pass_time=approach_info.latest_passes[bus_stop.code].passed_time
-            if bus_stop.code in approach_info.latest_passes
+            pole=bus_stop.pole,
+            last_pass_time=approach_info.latest_passes[
+                bus_stop.bus_stop_code
+            ].passed_time
+            if bus_stop.bus_stop_code in approach_info.latest_passes
             else None,
         )
         for bus_stop in approach_info.bus_stops
@@ -348,7 +354,7 @@ async def get_approach_for_station(
             approaching_buses.append(
                 ApproachingBusForStationRoute(
                     location=f"{n}停前を通過",
-                    previous_station=position.previous_stop.station_name,
+                    previous_station_name=position.previous_stop.station_name,
                     pass_time=position.passed_time,
                 )
             )
@@ -363,10 +369,10 @@ async def get_approach_for_station(
                 sort_key,
                 ApproachForStationRoute(
                     route_code=route_code,
-                    route_name=approach_info.route,
+                    route=approach_info.route,
                     direction=approach_info.direction,
                     last_pass_time=last_pass_time,
-                    pole=approach_bus_stop.pole_name
+                    pole=approach_bus_stop.pole
                     if approach_bus_stop
                     else "不明なのりば",
                     approaching_buses=approaching_buses,
@@ -374,6 +380,6 @@ async def get_approach_for_station(
             )
         )
     return ApproachForStationResponse(
-        approaches=[approach for _, approach in sorted(approaches, key=itemgetter(0))],
+        routes=[approach for _, approach in sorted(approaches, key=itemgetter(0))],
         url=f"https://www.kotsu.city.nagoya.jp/jp/pc/BUS/stand_access.html?name={station_name}",
     )
