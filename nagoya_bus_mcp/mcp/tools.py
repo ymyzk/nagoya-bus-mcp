@@ -1,7 +1,6 @@
 """MCP tool implementations for Nagoya Bus information queries."""
 
 import asyncio
-import difflib
 from functools import reduce
 from logging import getLogger
 from operator import iadd, itemgetter
@@ -10,7 +9,13 @@ from typing import TYPE_CHECKING, Annotated, cast
 from fastmcp import Context
 from pydantic import BaseModel, Field
 
+from nagoya_bus_mcp.approach import (
+    ApproachBusStop,
+    ApproachPosition,
+    get_realtime_approach,
+)
 from nagoya_bus_mcp.client import Client
+from nagoya_bus_mcp.data import BaseData
 
 if TYPE_CHECKING:
     from nagoya_bus_mcp.mcp.server import LifespanContext
@@ -56,88 +61,6 @@ class TimeTableResponse(BaseModel):
     station_number: int
     timetables: list[TimeTable]
     url: str
-
-
-class ApproachBusStop(BaseModel):
-    """Information about a bus stop on a specific route.
-
-    Contains the code, station name, station number, and pole name.
-    """
-
-    code: Annotated[str, Field(description="コード (例: 02200702)")]
-    station_number: Annotated[int, Field(description="バス停番号 (例: 02200)")]
-    station_name: Annotated[str, Field(description="バス停名")]
-    pole_name: Annotated[str, Field(description="乗り場名")]
-
-
-class ApproachPosition(BaseModel):
-    """Information about a bus position on a specific route.
-
-    Contains the car code, previous stop, next stop, and passed time.
-    """
-
-    car_code: str
-    previous_stop: ApproachBusStop
-    passed_time: Annotated[str, Field(description="通過時刻(HH:MM:SS形式)")]
-    next_stop: ApproachBusStop
-
-
-class ApproachInfo(BaseModel):
-    """Real-time approach information for a specific route."""
-
-    route: Annotated[str, Field(description="路線")]
-    direction: Annotated[str, Field(description="方面")]
-    bus_stops: list[ApproachBusStop]
-    latest_passes: dict[str, ApproachPosition]
-    current_positions: list[ApproachPosition]
-
-    def _get_index_for_code(self, code: str) -> int | None:
-        """Get the index of a bus stop by its code.
-
-        Args:
-            code: The bus stop code to look up.
-        """
-        for i, bus_stop in enumerate(self.bus_stops):
-            if bus_stop.code == code:
-                return i
-        return None
-
-    def get_last_pass_time_for_code(self, code: str) -> str | None:
-        """Get the last pass time for a given bus stop code.
-
-        Args:
-            code: The bus stop code to look up.
-        """
-        if code in self.latest_passes:
-            return self.latest_passes[code].passed_time
-        return None
-
-    def get_bus_stop_for_code(self, code: str) -> ApproachBusStop | None:
-        """Get the bus stop information for a given bus stop code.
-
-        Args:
-            code: The bus stop code to look up.
-        """
-        index = self._get_index_for_code(code)
-        return None if index is None else self.bus_stops[index]
-
-    def get_current_positions_before_code(
-        self, code: str
-    ) -> list[tuple[int, ApproachPosition]]:
-        """Get the current bus positions before a given bus stop code.
-
-        Args:
-            code: The bus stop code to look up.
-        """
-        target_stop_index = self._get_index_for_code(code)
-        if target_stop_index is None:
-            return []
-        positions: list[tuple[int, ApproachPosition]] = []
-        for position in self.current_positions:
-            previous_stop_index = self.bus_stops.index(position.previous_stop)
-            if previous_stop_index < target_stop_index:
-                positions.append((target_stop_index - previous_stop_index, position))
-        return positions
 
 
 class ApproachForRouteBusStop(ApproachBusStop):
@@ -198,19 +121,14 @@ class ApproachForStationResponse(BaseModel):
     url: str
 
 
-_cached_pole_names: dict[str, str] | None = None
-_cached_station_names: dict[str, int] | None = None
-_cached_station_numbers: dict[int, str] | None = None
-
-
-def _get_client_from_context(ctx: Context) -> Client:
-    """Extract the bus client from the context.
+def _get_context_from_context(ctx: Context) -> tuple[Client, BaseData]:
+    """Extract the bus client and base data from the context.
 
     Args:
         ctx: The FastMCP context object.
 
     Returns:
-        The bus client instance.
+        A tuple of (Client, BaseData).
 
     Raises:
         RuntimeError: If request_context is None.
@@ -224,31 +142,7 @@ def _get_client_from_context(ctx: Context) -> Client:
         )
         raise RuntimeError(msg)
     lifespan_context = cast("LifespanContext", ctx.request_context.lifespan_context)
-    return lifespan_context.bus_client
-
-
-async def _get_pole_names(client: Client) -> dict[str, str]:
-    global _cached_pole_names  # noqa: PLW0603
-    if _cached_pole_names is None:
-        poles = (await client.get_bus_stop_pole_info()).root
-        _cached_pole_names = {code: pole.n for code, pole in poles.items()}
-    return _cached_pole_names
-
-
-async def _get_station_names(client: Client) -> dict[str, int]:
-    global _cached_station_names  # noqa: PLW0603
-    if _cached_station_names is None:
-        _cached_station_names = (await client.get_station_names()).root
-    return _cached_station_names
-
-
-async def _get_station_numbers(client: Client) -> dict[int, str]:
-    global _cached_station_numbers  # noqa: PLW0603
-    if _cached_station_numbers is None:
-        _cached_station_numbers = {
-            num: name for name, num in (await _get_station_names(client)).items()
-        }
-    return _cached_station_numbers
+    return lifespan_context.bus_client, lifespan_context.base_data
 
 
 async def get_station_number(
@@ -267,13 +161,12 @@ async def get_station_number(
         StationNumberResponse with success flag and matched station details,
         or None if the context is unavailable.
     """
-    client = _get_client_from_context(ctx)
+    _, base_data = _get_context_from_context(ctx)
 
     log.info("Getting station number for %s", station_name)
-    station_names = await _get_station_names(client)
 
     # First try exact match
-    station_number = station_names.get(station_name)
+    station_number = base_data.get_station_number(station_name)
     if station_number is not None:
         return StationNumberResponse(
             success=True, station_name=station_name, station_number=station_number
@@ -281,13 +174,10 @@ async def get_station_number(
 
     # If no exact match, try fuzzy matching
     log.info("No exact match found for %s, trying fuzzy matching", station_name)
-    closest_matches = difflib.get_close_matches(
-        station_name, station_names.keys(), n=1, cutoff=0.6
-    )
+    closest_station_number = base_data.find_station_number(station_name, cutoff=0.6)
 
-    if closest_matches:
-        closest_station = closest_matches[0]
-        closest_station_number = station_names[closest_station]
+    if closest_station_number is not None:
+        closest_station = base_data.get_station_name(closest_station_number)
         log.info(
             "Found closest match: %s (station number: %s)",
             closest_station,
@@ -317,9 +207,9 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
         TimeTableResponse with all timetables for the station, or None if the
         station is not found.
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
-    station_name = (await _get_station_numbers(client)).get(station_number)
+    station_name = base_data.get_station_name(station_number)
     if station_name is None:
         log.warning("Station number %s not found", station_number)
         return None
@@ -362,108 +252,6 @@ async def get_timetable(ctx: Context, station_number: int) -> TimeTableResponse 
     )
 
 
-async def _resolve_bus_stop(client: Client, bus_stop_code: str) -> ApproachBusStop:
-    """Resolve bus stop code to station information."""
-    if len(bus_stop_code) < 5 or not bus_stop_code[:5].isdigit():  # noqa: PLR2004
-        msg = f"bus_stop_code must be at least 5 digits, got: {bus_stop_code!r}"
-        raise ValueError(msg)
-    station_number = int(bus_stop_code[:5].lstrip("0"))
-    station_name = (await _get_station_numbers(client)).get(station_number)
-    pole_name = (await _get_pole_names(client)).get(bus_stop_code)
-    return ApproachBusStop(
-        code=bus_stop_code,
-        station_number=station_number,
-        station_name=station_name or "不明なバス停",
-        pole_name=pole_name or "不明なのりば",
-    )
-
-
-_ROUTE_NAME_TRANSLATION_TABLE = str.maketrans(
-    "１２３４５６７８９０Ｃ－",  # noqa: RUF001
-    "1234567890C-",
-)
-
-
-def _normalize_route_name(name: str) -> str:
-    """Normalize route names by converting full-width characters to half-width."""
-    return name.translate(_ROUTE_NAME_TRANSLATION_TABLE)
-
-
-async def _get_realtime_approach(client: Client, route_code: str) -> ApproachInfo:
-    """Get real-time bus approach and position information for a route.
-
-    This is a helper function that retrieves and processes real-time approach
-    data for a given route code.
-    """
-    keito = await client.get_keito(route_code)
-
-    # e.g., ["62185701", "71060701", "31165701", ...]
-    bus_stop_codes: list[str] = keito.busstops
-    approach = await client.get_realtime_approach(route_code)
-
-    bus_stops: list[ApproachBusStop] = await asyncio.gather(
-        *(_resolve_bus_stop(client, code) for code in bus_stop_codes)
-    )
-    code_to_bus_stop = {bus_stop.code: bus_stop for bus_stop in bus_stops}
-
-    latest_passes: dict[str, ApproachPosition] = {}
-    for station_pole_with_slash, passed_cars in approach.latest_bus_pass.items():
-        next_stop_id = station_pole_with_slash.replace("/", "")
-        next_stop_index = bus_stop_codes.index(next_stop_id)
-        if next_stop_index == 0:
-            log.warning(
-                "Next stop is the first stop, skipping as there is no previous stop"
-            )
-            continue
-        previous_stop_id = bus_stop_codes[next_stop_index - 1]
-        for car_code, passed_time in passed_cars.items():
-            if (
-                previous_stop_id in latest_passes
-                and latest_passes[previous_stop_id].passed_time >= passed_time
-            ):
-                continue
-            latest_passes[previous_stop_id] = ApproachPosition(
-                car_code=car_code,
-                previous_stop=code_to_bus_stop[previous_stop_id],
-                passed_time=passed_time,
-                next_stop=code_to_bus_stop[next_stop_id],
-            )
-
-    current_positions: list[ApproachPosition] = []
-    for station_pole_with_slash, passed_cars in approach.current_bus_positions.items():
-        next_stop_id = station_pole_with_slash.replace("/", "")
-        next_stop_index = bus_stop_codes.index(next_stop_id)
-        if next_stop_index == 0:
-            log.warning(
-                "Next stop is the first stop, skipping as there is no previous stop"
-            )
-            continue
-        previous_stop_id = bus_stop_codes[next_stop_index - 1]
-        for car_code, passed_time in passed_cars.items():
-            current_positions.append(
-                ApproachPosition(
-                    car_code=car_code,
-                    previous_stop=code_to_bus_stop[previous_stop_id],
-                    passed_time=passed_time,
-                    next_stop=code_to_bus_stop[next_stop_id],
-                )
-            )
-
-    direction = (
-        f"{keito.from_}発 {keito.article} {keito.to}行き"
-        if keito.article
-        else f"{keito.from_}発 {keito.to}行き"
-    )
-
-    return ApproachInfo(
-        route=_normalize_route_name(keito.name),
-        direction=direction,
-        bus_stops=bus_stops,
-        latest_passes=latest_passes,
-        current_positions=current_positions,
-    )
-
-
 async def get_approach(
     ctx: Context, route_code: str
 ) -> ApproachForRouteResponse | None:
@@ -480,11 +268,11 @@ async def get_approach(
         RouteApproachResponse with latest passages and current positions, or None
         if no data is available.
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
     log.info("Getting real-time approach information for route code %s", route_code)
 
-    approach_info = await _get_realtime_approach(client, route_code)
+    approach_info = await get_realtime_approach(client, base_data, route_code)
     bus_stops = [
         ApproachForRouteBusStop(
             code=bus_stop.code,
@@ -525,7 +313,7 @@ async def get_approach_for_station(
         ctx: FastMCP context containing the bus client.
         station_number: The station number to query (e.g., 22460).
     """
-    client = _get_client_from_context(ctx)
+    client, base_data = _get_context_from_context(ctx)
 
     log.info(
         "Getting real-time approach information for station number %s", station_number
@@ -540,7 +328,10 @@ async def get_approach_for_station(
     approaches: list[tuple[int, ApproachForStationRoute]] = []
 
     approach_infos = await asyncio.gather(
-        *(_get_realtime_approach(client, route_code) for route_code, _ in route_codes)
+        *(
+            get_realtime_approach(client, base_data, route_code)
+            for route_code, _ in route_codes
+        )
     )
 
     for (route_code, pole_code), approach_info in zip(

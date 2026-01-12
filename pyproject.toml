@@ -57,8 +57,9 @@ dev = [
     "pyrefly>=0.1.0",
     "pytest>=8.4.1",
     "pytest-asyncio>=1.1.0",
-    "pytest-randomly>=3.16.0",
     "pytest-cov>=6.2.1",
+    "pytest-mock>=3.14.0",
+    "pytest-randomly>=3.16.0",
 ]
 
 [tool.mypy]
