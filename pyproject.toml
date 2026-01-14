@@ -51,6 +51,9 @@ Issues = "https://github.com/ymyzk/nagoya-bus-mcp/issues"
 nagoya-bus-mcp = "nagoya_bus_mcp.__main__:main"
 
 [dependency-groups]
+demo = [
+    "openai-agents>=0.6.5",
+]
 dev = [
     "mypy>=1.17.0",
     "pre-commit>=4.2.0",
