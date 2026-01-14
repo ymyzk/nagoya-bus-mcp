@@ -68,16 +68,20 @@ uv build
 ### Project Structure
 
 ```
-nagoya_bus_mcp/
-├── __main__.py           # Entry point for the MCP server
-├── client.py             # HTTP client for Nagoya Bus API
-├── approach.py           # Wrapper and utilities for real-time approach information
-├── data.py               # Common base data (stations, poles) with caching
-├── mcp/
-│   ├── server.py         # FastMCP server initialization and lifespan
-│   ├── tools.py          # MCP tool implementations
-│   └── prompts.py        # MCP prompt templates
-└── version.py            # Auto-generated version file (from setuptools-scm)
+src/
+└── nagoya_bus_mcp/
+    ├── __main__.py           # Entry point for the MCP server
+    ├── client.py             # HTTP client for Nagoya Bus API
+    ├── approach.py           # Wrapper and utilities for real-time approach information
+    ├── data.py               # Common base data (stations, poles) with caching
+    ├── mcp/
+    │   ├── server.py         # FastMCP server initialization and lifespan
+    │   ├── tools.py          # MCP tool implementations
+    │   └── prompts.py        # MCP prompt templates
+    └── version.py            # Auto-generated version file (from setuptools-scm)
+
+demo/                         # Example integrations with AI agent frameworks
+tests/                        # Test suite with unit and integration tests
 ```
 
 ### Key Components
@@ -85,6 +89,7 @@ nagoya_bus_mcp/
 **API Client (`client.py`)**
 - `Client`: Async HTTP client wrapping the Nagoya City bus API
 - Uses `httpx.AsyncClient` for all HTTP requests
+- Implements HTTP response caching via `hishel` library with SQLite storage for improved performance
 - Implements context manager protocol for proper resource cleanup
 - **Important quirk**: The Nagoya Bus API returns HTML 404 pages with HTTP 200 status. The `_check_404()` method detects this by inspecting content-type and response body.
 - All API responses use Pydantic models with `alias_generator=str.upper` for field mapping
@@ -122,12 +127,20 @@ nagoya_bus_mcp/
 4. Response is validated via Pydantic models
 5. Tool transforms and returns data in MCP-friendly format
 
+### Demo Integration
+
+The `demo/` directory contains example integrations with AI agent frameworks:
+- `demo/agent.py`: OpenAI Agents SDK integration example
+- `demo/client.py`: Client wrapper with docstrings for agent use
+- Install demo dependencies with `uv sync --group demo`
+
 ### Testing Strategy
 
 - Unit tests mock `httpx.AsyncClient` transport to avoid real API calls
 - Integration tests (marked with `@pytest.mark.integration`) hit the real API
 - Tests use `pytest-asyncio` for async test support
-- Type checking enforced via mypy in strict mode
+- Type checking enforced via mypy and pyrefly in strict mode
+- Pre-commit hooks run ruff (format/lint), pyrefly (type check), and standard checks
 
 ### API Quirks to Know
 
