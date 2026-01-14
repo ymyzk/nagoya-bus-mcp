@@ -3,6 +3,7 @@
 | English Term   | Description  | Examples |
 |----------------|--------------|----------|
 | bus_stop_code  | のりばコード | 22580101 |
+| car_code       | 車両コード   | NMS 0053 |
 | direction      | 行き先       | 名古屋駅 |
 | pole           | のりば       | 6番      |
 | route          | 系統         | 鶴舞11   |
