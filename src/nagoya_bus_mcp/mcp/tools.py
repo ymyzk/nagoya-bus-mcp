@@ -182,6 +182,9 @@ async def get_station_number(ctx: Context, station_name: str) -> StationNumberRe
         station_name, cutoff=0.6
     ):
         closest_station = base_data.get_station_name(closest_station_number)
+        if closest_station is None:
+            msg = "Inconsistent base data: station number has no name"
+            raise ToolError(msg)
         log.info(
             "Found closest match: %s (station number: %s)",
             closest_station,
