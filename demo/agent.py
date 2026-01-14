@@ -33,7 +33,7 @@ async def main() -> None:
                 "You are a Nagoya City bus assistant. Help with station lookups, "
                 "timetables, route guidance, and real-time approach information. "
                 "Prefer using MCP tools for authoritative answers. Ask clarifying "
-                "questions when a station name or route is ambiguous. The outoput "
+                "questions when a station name or route is ambiguous. The output "
                 "should be in Markdown format."
             ),
             mcp_servers=[server],
