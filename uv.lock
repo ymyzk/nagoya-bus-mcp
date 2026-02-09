@@ -1262,7 +1262,7 @@ wheels = [
 
 [[package]]
 name = "openai-agents"
-version = "0.7.0"
+version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffe" },
@@ -1273,9 +1273,9 @@ dependencies = [
     { name = "types-requests" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f8/a2/63a5ff78d89fa0861fe461a7b91d2123315115dcbf2c3fdab051b99185e5/openai_agents-0.7.0.tar.gz", hash = "sha256:5a283e02ee0d7c0d869421de9918691711bf19d1b1dc4d2840548335f2d24de6", size = 2169530, upload-time = "2026-01-23T00:06:35.746Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1e/43/ccea6b70e3c4399eea24a7e0c0cde9e05727781e5b7dd2c00e2cebe09961/openai_agents-0.8.1.tar.gz", hash = "sha256:32dc6124359397e5775e936e621892576a0b2f5c88b3fc548a084334f6918541", size = 2373798, upload-time = "2026-02-06T22:44:24.24Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/a2/92/9cbbdd604f858056d4e4f105a1b99779128bae61b6a3681db0f035ef73b4/openai_agents-0.7.0-py3-none-any.whl", hash = "sha256:4446935a65d3bb1c2c1cd0546b1bc286ced9dde0adba947ab390b2e74802aa49", size = 288537, upload-time = "2026-01-23T00:06:33.78Z" },
+    { url = "https://files.pythonhosted.org/packages/f6/3f/49ff704c933cf2a3467c040b13231258bb1f2fa66d995c3b62b3a13c2eb4/openai_agents-0.8.1-py3-none-any.whl", hash = "sha256:a29916690f4ca2d67c0d782abbff99350ce2a7cee0067b8dd2c2297e38a3714a", size = 376922, upload-time = "2026-02-06T22:44:21.977Z" },
 ]
 
 [[package]]
