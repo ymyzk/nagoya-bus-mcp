@@ -45,7 +45,7 @@ class BusStopPoleInfo(BaseModel):
 
     bc: str  # e.g., "5E1"
     c: str  # e.g., "5E1"
-    n: str  # e.g., "1番"
+    n: str | None  # e.g., "1番"
 
 
 # e.g., {"01110301": ...}
