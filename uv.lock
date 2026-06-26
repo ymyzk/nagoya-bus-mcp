@@ -1332,7 +1332,7 @@ wheels = [
 
 [[package]]
 name = "openai-agents"
-version = "0.17.5"
+version = "0.17.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "griffelib" },
@@ -1340,13 +1340,12 @@ dependencies = [
     { name = "openai" },
     { name = "pydantic" },
     { name = "requests" },
-    { name = "types-requests" },
     { name = "typing-extensions" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/72/fe/ef185f2a21f2fba1b0b107f72a7646bb51369d4c4025e2ab4d1ec65764f3/openai_agents-0.17.5.tar.gz", hash = "sha256:5dd46943b993e1a68a78acd254fc6a00cf0455fc3dcc802078ea26964b14278c", size = 5420036, upload-time = "2026-06-11T04:12:35.775Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d4/b2/235cbfdefe86623fc77f65fc1d016686372f61d4a1bf3fc66151de2eb847/openai_agents-0.17.7.tar.gz", hash = "sha256:ca76e7f882c9d8f06e3dfb8064cc33bcb5a5f34a29816cb9af863f395964ff0c", size = 5485068, upload-time = "2026-06-24T05:15:33.705Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b9/f0/9184cd6d3d089a568fc544f1c7f0965d63818fa310c912b30abd333ea138/openai_agents-0.17.5-py3-none-any.whl", hash = "sha256:9afa8a67f0b9fbcdfd2d1545b38d3c52d47e4182921cb79952ad61580d950973", size = 846844, upload-time = "2026-06-11T04:12:32.485Z" },
+    { url = "https://files.pythonhosted.org/packages/1e/2e/2e96ca6928951fe1d16744c22dc1355eda1dd5b0dd920ca1d3ab602929f8/openai_agents-0.17.7-py3-none-any.whl", hash = "sha256:51b5ae43756eea37032e430f95979ba3999af6b1ade397df6c0ffeaf1939646a", size = 856074, upload-time = "2026-06-24T05:15:31.741Z" },
 ]
 
 [[package]]
@@ -2111,18 +2110,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/09/a9/6ba95a270c6f1fbcd8dac228323f2777d886cb206987444e4bce66338dd4/tqdm-4.67.3.tar.gz", hash = "sha256:7d825f03f89244ef73f1d4ce193cb1774a8179fd96f31d7e1dcde62092b960bb", size = 169598, upload-time = "2026-02-03T17:35:53.048Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/e1/3079a9ff9b8e11b846c6ac5c8b5bfb7ff225eee721825310c91b3b50304f/tqdm-4.67.3-py3-none-any.whl", hash = "sha256:ee1e4c0e59148062281c49d80b25b67771a127c85fc9676d3be5f243206826bf", size = 78374, upload-time = "2026-02-03T17:35:50.982Z" },
-]
-
-[[package]]
-name = "types-requests"
-version = "2.33.0.20260518"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "urllib3" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e0/01/c5a19253fe1ac159159ddf9a3a07cec8bb5e486ec4d9002ad2821da0e5d2/types_requests-2.33.0.20260518.tar.gz", hash = "sha256:df7bd3bfe0ca8402dfb841e7d9be714bb5578203283d66d7dc4ef69343449a5e", size = 24752, upload-time = "2026-05-18T06:07:37.966Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1c/bc/b139710a3b6018f7fb2b9508b35c8af564e61bf2bf4fa619d088f3e16f85/types_requests-2.33.0.20260518-py3-none-any.whl", hash = "sha256:626d697d1adaaff76e2044dc8c5c051d8f21abc157bdfe204a75558076fe0bf0", size = 21391, upload-time = "2026-05-18T06:07:37.044Z" },
 ]
 
 [[package]]
