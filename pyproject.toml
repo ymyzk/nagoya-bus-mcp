@@ -36,7 +36,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=3,<4",
+    "fastmcp>=3,<5",
     "hishel[httpx]>=1.1.7",
     "httpx>=0.28.1",
     "pydantic>=2.11.7",
